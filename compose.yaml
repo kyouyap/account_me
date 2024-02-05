@@ -1,0 +1,24 @@
+version: '3'
+services:
+  selenium:
+    container_name: seleniarm
+    image: seleniarm/standalone-chromium:latest
+    volumes:
+      - ./app/downloads:/downloads # ホストマシンのディレクトリをマウント
+    ports:
+      - 4444:4444
+      - 7900:7900
+    shm_size: "2gb"
+
+  app:
+    container_name: poetry-for-seleniarm
+    build:
+      dockerfile: app/Dockerfile
+    volumes:
+      - ./app:/app
+      - ./app/downloads:/app/downloads # 同じホストディレクトリをアプリケーションコンテナにマウント
+    environment:
+      SELENIUM_URL: http://selenium:4444/wd/hub
+    tty: true
+    depends_on:
+      - selenium
