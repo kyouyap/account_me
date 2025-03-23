@@ -7,7 +7,7 @@ import shutil
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, List, Optional  # pylint: disable=W0611
+from typing import Any, List, Optional
 
 import gspread
 import pandas as pd
@@ -33,11 +33,13 @@ def convert_cookies(selenium_cookies: list[dict]) -> dict[str, str]:
     """
     cookie_dict = {}
     for cookie in selenium_cookies:
-        cookie_dict[cookie['name']] = cookie['value']
+        cookie_dict[cookie["name"]] = cookie["value"]
     return cookie_dict
 
 
-def selenium_to_urllib3_download(driver: WebDriver, download_url: str, save_dir: Path) -> None:
+def selenium_to_urllib3_download(
+    driver: WebDriver, download_url: str, save_dir: Path
+) -> None:
     """
     SeleniumのWebDriverインスタンスと保存先ディレクトリを指定して、urllib3でファイルをダウンロードします。
 
@@ -56,13 +58,13 @@ def selenium_to_urllib3_download(driver: WebDriver, download_url: str, save_dir:
     # urllib3でHTTPリクエストを行う
     http = urllib3.PoolManager()
     headers = {
-        'Cookie': '; '.join([f'{name}={value}' for name, value in cookie_dict.items()])
+        "Cookie": "; ".join([f"{name}={value}" for name, value in cookie_dict.items()])
     }
-    response = http.request('GET', download_url, headers=headers)
+    response = http.request("GET", download_url, headers=headers)
 
     # ダウンロードしたファイルを指定されたディレクトリに保存
     file_path = os.path.join(save_dir, "download.csv")
-    with open(file_path, 'wb') as out:
+    with open(file_path, "wb") as out:
         out.write(response.data)
 
 
@@ -88,7 +90,8 @@ def configure_logging() -> None:
 
     # ファイルハンドラーの設定（ローテーションを含む）
     file_handler = RotatingFileHandler(
-        log_file_path, maxBytes=1024 * 1024 * 5, backupCount=5)
+        log_file_path, maxBytes=1024 * 1024 * 5, backupCount=5
+    )
     file_handler.setFormatter(logging.Formatter(log_format))
 
     # ルートロガーにファイルハンドラーを追加
@@ -141,15 +144,15 @@ def configure_chrome_driver() -> webdriver.Remote:
     chrome_options = Options()
     prefs = {
         "profile.default_content_settings.popups": 0,
-        "download.default_directory": "/downloads",  # Seleniumコンテナ内のダウンロードパス
+        "download.default_directory": "/app/downloads",  # Seleniumコンテナ内のダウンロードパス
         "safebrowsing.enabled": "false",
-
     }
     chrome_options.add_experimental_option("prefs", prefs)
 
     try:
         driver = webdriver.Remote(
-            command_executor=os.environ["SELENIUM_URL"], options=chrome_options)
+            command_executor=os.environ["SELENIUM_URL"], options=chrome_options
+        )
     except Exception as e:
         logger.info("WebDriverの初期化中にエラーが発生しました: %s", e)
         raise
@@ -190,7 +193,9 @@ def remove_unnecessary_files(download_dir: Path) -> None:
         file.unlink()
 
 
-def download_files_from_links(driver: WebDriver, links: List[str], download_dir: Path) -> None:
+def download_files_from_links(
+    driver: WebDriver, links: List[str], download_dir: Path
+) -> None:
     """リンクリストからファイルをダウンロードし、ダウンロードディレクトリに保存します。
 
     Args:
@@ -205,14 +210,12 @@ def download_files_from_links(driver: WebDriver, links: List[str], download_dir:
                 download_url: Optional[str] = link + "/csv"
                 if not download_url:
                     continue
-                selenium_to_urllib3_download(
-                    driver, download_url, download_dir)
+                selenium_to_urllib3_download(driver, download_url, download_dir)
                 time.sleep(5)
                 latest_file = get_latest_downloaded_filename(download_dir)
                 logger.info(latest_file)
                 if latest_file:
-                    shutil.move(str(latest_file), str(
-                        download_dir / f"{iter_num}.csv"))
+                    shutil.move(str(latest_file), str(download_dir / f"{iter_num}.csv"))
                 del download_url
             elif not link:
                 continue
@@ -223,14 +226,16 @@ def download_files_from_links(driver: WebDriver, links: List[str], download_dir:
                 # btn fc-button fc-button-today spec-fc-button-click-attached
                 driver.implicitly_wait(5)
                 driver.find_element(
-                    By.CSS_SELECTOR, ".btn.fc-button.fc-button-today.spec-fc-button-click-attached"
+                    By.CSS_SELECTOR,
+                    ".btn.fc-button.fc-button-today.spec-fc-button-click-attached",
                 ).click()
 
                 for iter_num2 in range(24):
                     logger.info("ダウンロードリンクにアクセス中...: %s", iter_num2)
                     driver.implicitly_wait(5)
                     driver.find_element(
-                        By.CSS_SELECTOR, ".btn.fc-button.fc-button-prev.spec-fc-button-click-attached"
+                        By.CSS_SELECTOR,
+                        ".btn.fc-button.fc-button-prev.spec-fc-button-click-attached",
                     ).click()
                     driver.implicitly_wait(5)
                     driver.find_element(By.PARTIAL_LINK_TEXT, "ダウンロード").click()
@@ -238,15 +243,17 @@ def download_files_from_links(driver: WebDriver, links: List[str], download_dir:
                     # driver.find_element(
                     #     By.PARTIAL_LINK_TEXT, "CSVファイル").click()
                     download_url = driver.find_element(
-                        By.PARTIAL_LINK_TEXT, "CSVファイル").get_attribute("href")
+                        By.PARTIAL_LINK_TEXT, "CSVファイル"
+                    ).get_attribute("href")
                     if download_url is None:
                         continue
-                    selenium_to_urllib3_download(
-                        driver, download_url, download_dir)
+                    selenium_to_urllib3_download(driver, download_url, download_dir)
                     latest_file = get_latest_downloaded_filename(download_dir)
                     if latest_file:
-                        shutil.move(str(latest_file), str(
-                            download_dir / f"{iter_num}_{iter_num2}.csv"))
+                        shutil.move(
+                            str(latest_file),
+                            str(download_dir / f"{iter_num}_{iter_num2}.csv"),
+                        )
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Error downloading file from %s", link)
             print(f"Error downloading file from {link}: {e}")
@@ -275,8 +282,11 @@ def get_links_for_download(driver: WebDriver, page_url: str) -> List[str]:
     links = []
     for table in tables[1:]:
         try:
-            link = table.find_element(By.TAG_NAME, "td").find_element(
-                By.TAG_NAME, "a").get_attribute("href")
+            link = (
+                table.find_element(By.TAG_NAME, "td")
+                .find_element(By.TAG_NAME, "a")
+                .get_attribute("href")
+            )
             if link:
                 links.append(link)
         except Exception as e:  # pylint: disable=broad-except
@@ -327,8 +337,7 @@ def scrape() -> None:
         if email is None or password is None:
             raise ValueError("Please set EMAIL and PASSWORD in .env file.")
 
-        login_to_site(
-            driver, "https://moneyforward.com/users/sign_in", email, password)
+        login_to_site(driver, "https://moneyforward.com/users/sign_in", email, password)
         logger.info("ログインしました。")
         logger.info("ファイルを削除中...")
         clean_download_dir(download_dir)
@@ -336,7 +345,8 @@ def scrape() -> None:
         logger.info("ファイルを削除しました。")
         # アカウントページからのダウンロード
         account_links = get_links_for_download(
-            driver, "https://moneyforward.com/accounts")
+            driver, "https://moneyforward.com/accounts"
+        )
         logger.info("ダウンロードリンクを取得しました。")
         logger.info(account_links)
         logger.info("ファイルをダウンロード中...")
@@ -345,14 +355,14 @@ def scrape() -> None:
         logger.info("ファイルを集約中...")
         aggregate_and_save_csv(
             download_dir,
-            Path.cwd() /
-            f"../outputs/aggregated_files/detail/detail_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+            Path.cwd()
+            / f"../outputs/aggregated_files/detail/detail_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
         )
         logger.info("ファイルを集約しました。")
 
         # 履歴ページからのダウンロード
         history_links = ["https://moneyforward.com/bs/history"]
-        clean_download_dir(Path("/app/downloads"))
+        clean_download_dir(download_dir)
         logger.info("ファイルを削除しました。")
         logger.info("ファイルをダウンロード中...")
         download_files_from_links(driver, history_links, download_dir)
@@ -360,8 +370,8 @@ def scrape() -> None:
         logger.info("ファイルを集約中...")
         aggregate_and_save_csv(
             download_dir,
-            Path.cwd() /
-            f"../outputs/aggregated_files/assets/assets_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+            Path.cwd()
+            / f"../outputs/aggregated_files/assets/assets_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
         )
         logger.info("ファイルを集約しました。")
         logger.info("ファイルを削除中...")
@@ -375,14 +385,20 @@ def scrape() -> None:
 
 def update_spreadsheet() -> None:
     """スプレッドシートを更新します。"""
-    scope = ["https://spreadsheets.google.com/feeds",
-             "https://www.googleapis.com/auth/drive"]
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        "../key/spreadsheet_managementkey.json", scope)
+        "../key/spreadsheet_managementkey.json", scope
+    )
 
     gc = gspread.authorize(credentials)
 
-    worksheet = gc.open_by_key(os.getenv("SPREADSHEET_KEY"))
+    spreadsheet_key = os.getenv("SPREADSHEET_KEY")
+    if spreadsheet_key is None:
+        raise ValueError("Please set SPREADSHEET_KEY in .env file.")
+    worksheet = gc.open_by_key(spreadsheet_key)
     # 計算対象	日付	内容	金額（円）	保有金融機関	大項目	中項目	メモ	振替	ID
     df_detail = pd.read_csv(
         Path(os.getcwd() + "/../outputs/aggregated_files/detail").resolve()
@@ -391,8 +407,13 @@ def update_spreadsheet() -> None:
     )
     df_detail["メモ"] = "なし"
     # 保有金融機関が'アメリカン・エキスプレスカード'のものの’金額（円）’だけ半額にする
-    df_detail.loc[df_detail["保有金融機関"] == "アメリカン・エキスプレスカード", "金額（円）"] = (
-        df_detail.loc[df_detail["保有金融機関"] == "アメリカン・エキスプレスカード", "金額（円）"] / 2
+    df_detail.loc[
+        df_detail["保有金融機関"] == "アメリカン・エキスプレスカード", "金額（円）"
+    ] = (
+        df_detail.loc[
+            df_detail["保有金融機関"] == "アメリカン・エキスプレスカード", "金額（円）"
+        ]
+        / 2
     )
     logger.info(df_detail)
     df_sps = get_as_dataframe(
@@ -450,7 +471,8 @@ def update_spreadsheet() -> None:
         ]
     ].dropna()
     df_sps = pd.concat([df_sps, df_assets], ignore_index=True).sort_values(
-        by="日付", ascending=True)
+        by="日付", ascending=True
+    )
     df_sps["日付"] = pd.to_datetime(df_sps["日付"], format="mixed")
     df_sps["日付"] = df_sps["日付"].dt.strftime("%Y/%m/%d")
     df_sps.sort_values(by="日付", ascending=True, inplace=True)
