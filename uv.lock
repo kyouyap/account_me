@@ -131,6 +131,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "selenium" },
+    { name = "types-pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -148,7 +149,6 @@ dev = [
     { name = "requests-mock" },
     { name = "ruff" },
     { name = "types-aiofiles" },
-    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -159,6 +159,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.8.1" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "selenium", specifier = ">=4.30.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20241230" },
 ]
 
 [package.metadata.requires-dev]
@@ -176,7 +177,6 @@ dev = [
     { name = "requests-mock", specifier = ">=1.12.1" },
     { name = "ruff", specifier = ">=0.6.3" },
     { name = "types-aiofiles", specifier = ">=24.1.0.20241221" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20241230" },
 ]
 
 [[package]]
