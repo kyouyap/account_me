@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class FileDownloader:
     """ファイルダウンロードを管理するクラス。"""
 
-    def __init__(self, download_dir: Path):
+    def __init__(self, download_dir: Path) -> None:
         """
         Args:
             download_dir: ダウンロードディレクトリのパス。
@@ -215,21 +215,28 @@ class FileDownloader:
                                 )
 
             except Exception as e:
+                error_msg = str(e)
                 logger.error(
                     "ファイルのダウンロードに失敗しました - リンク: %s, エラー: %s, 成功済みファイル数: %d",
                     link,
-                    str(e),
+                    error_msg,
                     len(downloaded_files),
                 )
+                # ダウンロードの試行を続行
                 continue
 
-        if not downloaded_files:
+        if not downloaded_files and links:
+            error_msg = "ダウンロードに成功したファイルがありません。全てのダウンロードが失敗しました。"
             logger.error(
                 "ダウンロード処理が完全に失敗しました。ダウンロード試行数: %d",
                 len(links),
             )
-            raise DownloadError(
-                "ダウンロードに成功したファイルがありません。全てのダウンロードが失敗しました。"
-            )
-
-        return downloaded_files
+            raise DownloadError(error_msg)
+        else:
+            if links and len(downloaded_files) < len(links):
+                logger.warning(
+                    "一部のダウンロードのみ成功しました。成功数: %d/%d",
+                    len(downloaded_files),
+                    len(links),
+                )
+            return downloaded_files

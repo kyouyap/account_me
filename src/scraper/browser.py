@@ -203,20 +203,43 @@ class BrowserManager:
         self.driver.get(page_url)
 
         try:
-            table = self.wait_and_find_element(By.CLASS_NAME, "accounts")  # type: ignore
-            table = table.find_element(By.CSS_SELECTOR, ".table.table-striped")
-            rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # ヘッダーを除外
+            # アカウントテーブルを取得
+            accounts_table = self.wait_and_find_element(By.CLASS_NAME, "accounts")  # type: ignore
+
+            try:
+                # データテーブルを取得
+                table = accounts_table.find_element(
+                    By.CSS_SELECTOR, ".table.table-striped"
+                )
+            except NoSuchElementException as e:
+                raise ScrapingError(f"データテーブルの取得に失敗しました: {e}") from e
+
+            # テーブルの行を取得
+            try:
+                rows = table.find_elements(By.TAG_NAME, "tr")
+            except NoSuchElementException as e:
+                raise ScrapingError(
+                    f"テーブルの行データの抽出に失敗しました: {e}"
+                ) from e
+
+            # 空のテーブルをチェック
+            if len(rows) <= 1:  # ヘッダー行のみ、またはデータなし
+                logger.warning("テーブルにデータがありません")
+                return []
+
+            # ヘッダー行を除外
+            rows = rows[1:]
 
             links = []
             for row in rows:
                 try:
-                    link = (
-                        row.find_element(By.TAG_NAME, "td")
-                        .find_element(By.TAG_NAME, "a")
-                        .get_attribute("href")
-                    )
+                    # td要素を探して、その中のaタグを取得
+                    cell = row.find_element(By.TAG_NAME, "td")
+                    link_element = cell.find_element(By.TAG_NAME, "a")
+                    link = link_element.get_attribute("href")
                     if link:
                         links.append(link)
+                        logger.info("リンクを抽出しました: %s", link)
                 except (NoSuchElementException, StaleElementReferenceException) as e:
                     logger.warning(
                         "アカウントリンクの抽出に失敗しました: %s（現在の抽出済みリンク数: %d）",

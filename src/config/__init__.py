@@ -36,11 +36,32 @@ class Config:
     def _load_settings(self) -> None:
         """YAML設定ファイルを読み込む。"""
         settings_path = self.config_dir / "settings.yaml"
-        if not settings_path.exists():
-            raise ConfigurationError(f"設定ファイルが見つかりません: {settings_path}")
+        try:
+            if not settings_path.exists():
+                raise FileNotFoundError(
+                    f"設定ファイルが見つかりません: {settings_path}"
+                )
 
-        with open(settings_path, "r", encoding="utf-8") as f:
-            self.settings = yaml.safe_load(f)
+            if not settings_path.is_file():
+                raise ConfigurationError(
+                    f"設定ファイルが正しくありません: {settings_path}"
+                )
+
+            with open(settings_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if not content.strip():
+                    raise ConfigurationError(f"設定ファイルが空です: {settings_path}")
+                self.settings = yaml.safe_load(content)
+                if not isinstance(self.settings, dict):
+                    raise ConfigurationError(
+                        f"設定ファイルの形式が正しくありません: {settings_path}"
+                    )
+        except FileNotFoundError as e:
+            raise ConfigurationError(str(e))
+        except (yaml.YAMLError, OSError) as e:
+            raise ConfigurationError(
+                f"設定ファイルの読み込みに失敗: {settings_path}: {e}"
+            )
 
     def _load_env(self) -> None:
         """環境変数を読み込む。"""

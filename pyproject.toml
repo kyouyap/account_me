@@ -23,6 +23,22 @@ ignore_missing_imports = true
 module = "gspread_dataframe"
 ignore_missing_imports = true
 
+[tool.pytest.ini_options]
+pythonpath = "src"
+testpaths = ["test"]
+python_files = ["test_*.py"]
+addopts = "--cov=src --cov-report=term-missing --cov-report=html"
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "raise AssertionError",
+    "if __name__ == .__main__.:"
+]
+omit = ["src/main.py"]
+
 [tool.uv]
 dev-dependencies = [
     "pytest>=8.3.2",
@@ -37,4 +53,6 @@ dev-dependencies = [
     "types-aiofiles>=24.1.0.20241221",
     "pandas-stubs>=2.2.3.250308",
     "types-pyyaml>=6.0.12.20241230",
+    "pytest-asyncio>=0.25.3",
+    "requests-mock>=1.12.1",
 ]

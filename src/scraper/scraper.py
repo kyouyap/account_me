@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class MoneyForwardScraper:
     """MoneyForwardのスクレイピングを実行するクラス。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """スクレイパーの初期化。"""
         self.download_dir = Path(settings.paths.downloads)
         self.browser_manager = BrowserManager()
@@ -40,16 +40,28 @@ class MoneyForwardScraper:
 
     def _clean_directories(self) -> None:
         """作業ディレクトリをクリーンアップします。"""
-        self.file_downloader.clean_download_dir()
+        try:
+            self.file_downloader.clean_download_dir()
+        except OSError as e:
+            logger.error(
+                "ダウンロードディレクトリのクリーンアップに失敗しました: %s", e
+            )
+
         for directory in [
             Path(settings.paths.outputs.aggregated_files.detail),
             Path(settings.paths.outputs.aggregated_files.assets),
         ]:
-            if directory.exists():
-                for file in directory.glob("*"):
-                    file.unlink()
-            else:
-                directory.mkdir(parents=True)
+            try:
+                if directory.exists():
+                    for file in directory.glob("*"):
+                        try:
+                            file.unlink()
+                        except OSError as e:
+                            logger.error("ファイルの削除に失敗しました %s: %s", file, e)
+                else:
+                    directory.mkdir(parents=True)
+            except OSError as e:
+                logger.error("ディレクトリの操作に失敗しました %s: %s", directory, e)
 
     def _read_csv_with_encoding(self, file_path: Path) -> pd.DataFrame:
         """複数のエンコーディングを試行してCSVファイルを読み込みます。
@@ -63,7 +75,13 @@ class MoneyForwardScraper:
         Raises:
             MoneyForwardError: すべてのエンコーディングで読み込みに失敗した場合。
         """
+        # ファイルサイズチェック
+        if file_path.stat().st_size == 0:
+            raise MoneyForwardError("CSVファイルが空です。")
+
         encodings = ["utf-8", "shift-jis", "cp932"]
+        errors = []
+        decode_errors = []
 
         for encoding in encodings:
             try:
@@ -72,12 +90,47 @@ class MoneyForwardScraper:
                     file_path,
                     encoding,
                 )
-                return pd.read_csv(file_path, encoding=encoding)
-            except UnicodeDecodeError:
-                logger.info("エンコーディング '%s' での読み込みに失敗", encoding)
-                continue
+                df = pd.read_csv(file_path, encoding=encoding)
+                if df.empty:
+                    logger.warning("CSVファイルにデータがありません")
+                    continue
 
-        raise MoneyForwardError(f"CSVファイル '{file_path}' を読み込めませんでした。")
+                logger.info(
+                    "ファイル '%s' をエンコーディング '%s' で読み込みに成功",
+                    file_path,
+                    encoding,
+                )
+                return df
+            except UnicodeDecodeError as e:
+                logger.warning(
+                    "エンコーディング '%s' での読み込みに失敗: %s",
+                    encoding,
+                    str(e),
+                )
+                decode_errors.append(f"{encoding}: {str(e)}")
+            except Exception as e:
+                logger.error(
+                    "ファイル '%s' の読み込み中に予期せぬエラーが発生: %s",
+                    file_path,
+                    str(e),
+                )
+                errors.append(f"{encoding}: {str(e)}")
+
+        # エラー内容に応じたメッセージを表示
+        if decode_errors:
+            error_details = "\n".join(decode_errors)
+            raise MoneyForwardError(
+                f"CSVファイル '{file_path}' を読み込めませんでした。対応していないエンコーディングの可能性があります。\n詳細:\n{error_details}"
+            )
+        elif errors:
+            error_details = "\n".join(errors)
+            raise MoneyForwardError(
+                f"CSVファイルの読み込みに失敗しました: \n{error_details}"
+            )
+        else:
+            raise MoneyForwardError(
+                f"CSVファイル '{file_path}' の読み込みに失敗しました: データが空です"
+            )
 
     def _aggregate_csv_files(self, output_path: Path) -> None:
         """CSVファイルを集約します。

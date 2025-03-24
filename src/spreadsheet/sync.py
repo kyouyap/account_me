@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class SpreadsheetSync:
     """Google Spreadsheetとの同期を管理するクラス。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初期化。"""
         self._client: Optional[gspread.Client] = None
 
