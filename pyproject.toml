@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.10.6",
     "pydantic-settings>=2.8.1",
     "types-pyyaml>=6.0.12.20241230",
+    "pandas-stubs>=2.2.3.250308",
 ]
 
 [tool.mypy]
@@ -52,7 +53,6 @@ dev-dependencies = [
     "pytest-subtests>=0.14.1",
     "coverage>=7.6.12",
     "types-aiofiles>=24.1.0.20241221",
-    "pandas-stubs>=2.2.3.250308",
     "pytest-asyncio>=0.25.3",
     "requests-mock>=1.12.1",
 ]
