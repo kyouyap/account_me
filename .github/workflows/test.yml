@@ -20,12 +20,12 @@ jobs:
 
     - name: Run tests in Docker container
       run: |
-        docker run --rm -e PYTHONPATH=src my-app:latest pytest test/
+        docker run --rm -e PYTHONPATH=src my-app:latest pytest /app/test/
 
     - name: Run mypy in Docker container
       run: |
-        docker run --rm my-app:latest mypy src test/
+        docker run --rm my-app:latest mypy /app/src /app/test/
 
     - name: Run ruff in Docker container
       run: |
-        docker run --rm my-app:latest ruff check src test/
+        docker run --rm my-app:latest ruff check /app/src /app/test/
