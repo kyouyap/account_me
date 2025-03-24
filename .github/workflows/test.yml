@@ -25,6 +25,12 @@ jobs:
         pip install .
         pip install pytest pytest-cov mypy ruff
 
+    - name: Copy configuration files
+      run: |
+        mkdir -p /app/config
+        cp config/settings.yaml /app/config/
+        cp config/logging.yaml /app/config/
+
     - name: Run mypy (Static Type Check)
       run: |
         mypy src test
