@@ -20,7 +20,7 @@ jobs:
 
     - name: Run tests in Docker container
       run: |
-        docker run --rm my-app:latest pytest
+        docker run --rm -e PYTHONPATH=src my-app:latest pytest
 
     - name: Run mypy in Docker container
       run: |
