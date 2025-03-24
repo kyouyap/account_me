@@ -21,3 +21,13 @@ repos:
         language: system
         types: ["dockerfile"]
         entry: hadolint
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [commit]
