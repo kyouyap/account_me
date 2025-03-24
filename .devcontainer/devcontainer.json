@@ -5,52 +5,45 @@
     ],
     "service": "app",
     "workspaceFolder": "/app",
+    "features": {
+        "ghcr.io/dhoeric/features/hadolint:1": {}
+    },
     "customizations": {
         "vscode": {
             "extensions": [
+                "charliermarsh.ruff",
+                "codezombiech.gitignore",
+                "exiasr.hadolint",
+                "kevinrose.vsc-python-indent",
+                "mosapride.zenkaku",
                 "ms-python.python",
-                "GitHub.copilot",
-                "GitHub.copilot-chat",
-                "ms-python.python",
-                "VisualStudioExptTeam.vscodeintellicode",
-                "Meezilla.json",
-                "ms-azuretools.vscode-docker",
-                "ms-python.autopep8",
-                "ms-python.pylint",
-                "matangover.mypy",
-                "ms-python.black-formatter",
-                "ms-python.isort",
-                "ms-toolsai.jupyter"
+                "oderwat.indent-rainbow",
+                "shardulm94.trailing-spaces",
+                "usernamehw.errorlens",
+                "saoudrizwan.claude-dev",
+                "ms-python.mypy-type-checker"
             ],
             "settings": {
-                "editor.formatOnSave": true,
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
                 "[python]": {
-                    "editor.formatOnSave": true,
-                    "editor.defaultFormatter": "ms-python.black-formatter",
+                    "editor.defaultFormatter": "charliermarsh.ruff",
                     "editor.codeActionsOnSave": {
-                        "source.organizeImports": true
+                        "source.fixAll.ruff": "explicit",
+                        "source.organizeImports.ruff": "explicit"
                     },
-                    "python.defaultInterpreterPath": "/usr/local/bin/python",
-                    "python.linting.pylintArgs": [
-                        "--disable=C0103,C0111,W0611,E0401"
-                    ],
-                    "python.testing.pytestPath": "/usr/local/bin/pytest",
-                    "python.testing.pytest": [
-                        "--config=${containerWorkspaceFolder}/pyproject.toml"
-                    ],
-                    "python.testing.unittestEnabled": false,
-                    "python.testing.pytestEnabled": true,
-                    "terminal.integrated.profiles.linux": {
-                        "bash": {
-                            "path": "/bin/bash"
-                        }
-                    },
-                    "terminal.integrated.defaultProfile.linux": "bash",
-                    // Pylance
-                    "python.languageServer": "Pylance",
-                    "python.analysis.completeFunctionParens": true,
+                    "editor.formatOnSave": true
+                },
+                "files.insertFinalNewline": true,
+                "files.trimTrailingWhitespace": true,
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/bin/zsh"
+                    }
                 }
             }
         }
-    }
+    },
+    "postStartCommand": "uv run pre-commit install;",
+    "remoteUser": "vscode"
 }

@@ -4,7 +4,7 @@ services:
     container_name: seleniarm
     image: seleniarm/standalone-chromium:latest
     volumes:
-      - ./app/downloads:/downloads # ホストマシンのディレクトリをマウント
+      - ./downloads:/downloads # ホストマシンのディレクトリをマウント
     ports:
       - 4444:4444
       - 7900:7900
@@ -13,10 +13,10 @@ services:
   app:
     container_name: poetry-for-seleniarm
     build:
-      dockerfile: app/Dockerfile
+      dockerfile: Dockerfile
     volumes:
-      - ./app:/app
-      - ./app/downloads:/app/downloads # 同じホストディレクトリをアプリケーションコンテナにマウント
+      - ./:/app
+      - ./downloads:/app/downloads # 同じホストディレクトリをアプリケーションコンテナにマウント
     environment:
       SELENIUM_URL: http://selenium:4444/wd/hub
     tty: true

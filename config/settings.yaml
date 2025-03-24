@@ -1,0 +1,62 @@
+moneyforward:
+  base_url: "https://moneyforward.com"
+  endpoints:
+    login: "/users/sign_in"
+    accounts: "/accounts"
+    history: "/bs/history"
+  selenium:
+    download_directory: "/app/downloads"
+    timeout: 5
+    retry_count: 3
+  special_rules:
+    - institution: "アメリカン・エキスプレスカード"
+      action: "divide_amount"
+      value: 2
+
+spreadsheet:
+  worksheets:
+    household_data:
+      name: "@家計簿データ 貼付"
+      start_row: 4
+      columns:
+        - name: "計算対象"
+          col: 3
+        - name: "日付"
+          col: 4
+        - name: "内容"
+          col: 5
+        - name: "金額（円）"
+          col: 6
+        - name: "保有金融機関"
+          col: 7
+        - name: "大項目"
+          col: 8
+        - name: "中項目"
+          col: 9
+        - name: "メモ"
+          col: 10
+        - name: "振替"
+          col: 11
+        - name: "ID"
+          col: 12
+    assets_data:
+      name: "@資産推移 貼付"
+      start_row: 4
+      columns:
+        - name: "日付"
+          col: 1
+        - name: "合計（円）"
+          col: 2
+        - name: "預金・現金・暗号資産（円）"
+          col: 3
+        - name: "投資信託（円）"
+          col: 4
+
+paths:
+  outputs:
+    base: "/app/outputs"
+    aggregated_files:
+      detail: "/app/outputs/aggregated_files/detail"
+      assets: "/app/outputs/aggregated_files/assets"
+  downloads: "/app/downloads"
+  credentials: "/app/key/spreadsheet_managementkey.json"
