@@ -30,7 +30,7 @@ ignore_missing_imports = true
 pythonpath = "src"
 testpaths = ["test"]
 python_files = ["test_*.py"]
-addopts = "--cov=src --cov-report=term-missing --cov-report=html"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.report]
 exclude_lines = [

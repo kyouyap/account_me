@@ -20,7 +20,7 @@ jobs:
 
     - name: Run tests in Docker container
       run: |
-        docker run --rm my-app:latest pytest --cov=src --cov-report=term-missing --cov-report=html
+        docker run --rm my-app:latest pytest
 
     - name: Run mypy in Docker container
       run: |
