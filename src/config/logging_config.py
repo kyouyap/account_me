@@ -16,15 +16,13 @@ def setup_logging() -> None:
     ファイルが存在しない場合は基本的な設定を使用する。
     """
     config_path = Path("/app/config/logging.yaml")
-
+    log_dir = Path("/app/log")
+    log_dir.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
             logging.config.dictConfig(config)
     else:
-        # ログディレクトリの存在を確認、なければ作成
-        log_dir = Path("/app/log")
-        log_dir.mkdir(parents=True, exist_ok=True)
         # 基本的なロギング設定
         logging.basicConfig(
             level=logging.INFO,
