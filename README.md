@@ -106,7 +106,7 @@ Google Sheets APIを利用してスプレッドシートの編集権限を得る
 - Cronジョブを使用して、定期的にデータ取得からスプレッドシートの更新までを自動化
 - `docker-compose up -d`で実行し、crontabで以下のようなコマンドを設定（例）：
     ```cron
-    * */12 * * * /usr/bin/docker exec uv-for-seleniarm python main.py
+    * */12 * * * /usr/bin/docker exec uv-for-seleniarm python /app/src/main.py
     ```
 
 ## ダッシュボードの利用
