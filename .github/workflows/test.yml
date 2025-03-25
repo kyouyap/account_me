@@ -1,0 +1,23 @@
+name: CI Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build CI Docker image using Dockerfile.ci
+        run: docker build -f Dockerfile.ci -t my-app:ci .
+
+      - name: Run tests in container
+        run: docker run --rm my-app:ci

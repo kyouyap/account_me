@@ -28,7 +28,9 @@ class Config:
         if self._initialized:
             return
 
-        self.config_dir = Path("/app/config")
+        self.config_dir = (
+            Path(__file__).resolve().parent.parent.parent.joinpath("config")
+        )
         self._load_settings()
         self._load_env()
         self._initialized = True
