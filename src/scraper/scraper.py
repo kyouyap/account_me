@@ -151,7 +151,7 @@ class MoneyForwardScraper:
                 logger.info("ファイル '%s' の処理を開始", file_path)
                 df = self._read_csv_with_encoding(file_path)
                 if "金額（円）" in df.columns and "保有金融機関" in df.columns:
-                    # アメリカン・エキスプレスカードの金額を半額に
+                    # 初期設定ではアメリカン・エキスプレスカードの金額を半額に
                     for rule in settings.moneyforward.special_rules:
                         if rule.action == "divide_amount":
                             # 警告を防ぐため、明示的に数値型に変換
