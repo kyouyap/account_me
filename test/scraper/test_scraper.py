@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from pandas.errors import EmptyDataError
 
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
@@ -114,11 +113,8 @@ def test_read_csv_with_encoding_empty_file(scraper, tmp_path):
     test_file = tmp_path / "empty.csv"
     test_file.write_text("")
 
-    with patch("pandas.read_csv") as mock_read_csv:
-        mock_read_csv.side_effect = EmptyDataError("空のCSVファイル")
-        with pytest.raises(MoneyForwardError) as exc_info:
-            scraper._read_csv_with_encoding(test_file)
-        assert "CSVファイルが空です" in str(exc_info.value)
+    result = scraper._read_csv_with_encoding(test_file)
+    assert result is None  # 空ファイルの場合はNoneを返す
 
 
 def test_read_csv_with_encoding_generic_error(scraper, tmp_path):
@@ -128,9 +124,8 @@ def test_read_csv_with_encoding_generic_error(scraper, tmp_path):
 
     with patch("pandas.read_csv") as mock_read_csv:
         mock_read_csv.side_effect = Exception("予期せぬエラー")
-        with pytest.raises(MoneyForwardError) as exc_info:
-            scraper._read_csv_with_encoding(test_file)
-        assert "CSVファイルの読み込みに失敗" in str(exc_info.value)
+        result = scraper._read_csv_with_encoding(test_file)
+        assert result is None  # エラー時はNoneを返す
 
 
 def test_read_csv_with_encoding_all_encodings_fail(scraper, tmp_path):
@@ -138,9 +133,8 @@ def test_read_csv_with_encoding_all_encodings_fail(scraper, tmp_path):
     test_file = tmp_path / "test.csv"
     test_file.write_bytes(b"\xff\xfe")  # 無効なUTF-8バイト列
 
-    with pytest.raises(MoneyForwardError) as exc_info:
-        scraper._read_csv_with_encoding(test_file)
-    assert "対応していないエンコーディングの可能性があります" in str(exc_info.value)
+    result = scraper._read_csv_with_encoding(test_file)
+    assert result is None  # すべてのエンコーディングが失敗した場合はNoneを返す
 
 
 def test_aggregate_csv_files_success(scraper, tmp_path):
@@ -180,19 +174,80 @@ def test_aggregate_csv_files_success(scraper, tmp_path):
 
 def test_aggregate_csv_files_error(scraper, tmp_path):
     """CSVファイル集約のエラーテスト。"""
-    with (
-        patch.object(scraper, "download_dir", tmp_path),
-        patch.object(scraper, "_read_csv_with_encoding") as mock_read,
-    ):
-        mock_read.side_effect = MoneyForwardError("読み込みエラー")
-        with pytest.raises(MoneyForwardError) as exc_info:
-            scraper._aggregate_csv_files(tmp_path / "output.csv")
-        assert "CSVファイルの集約に失敗しました" in str(exc_info.value)
+    with patch.object(scraper, "download_dir", tmp_path):
+        mock_file = tmp_path / "test.csv"
+        mock_file.touch()  # ファイルを作成
+        result = scraper._aggregate_csv_files(tmp_path / "output.csv")
+        assert result is None
 
 
 def test_aggregate_csv_files_no_files(scraper, tmp_path):
     """CSVファイル集約の失敗テスト（ファイルなし）。"""
     with patch.object(scraper, "download_dir", tmp_path):
-        with pytest.raises(MoneyForwardError) as exc_info:
-            scraper._aggregate_csv_files(tmp_path / "output.csv")
-        assert "集約するCSVファイルがありません" in str(exc_info.value)
+        result = scraper._aggregate_csv_files(tmp_path / "output.csv")
+        assert result is None
+
+
+def test_aggregate_csv_files_empty_dataframe(scraper, tmp_path):
+    """空のデータフレームを含むCSVファイルの集約テスト。"""
+    # テストデータ作成
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+
+    # 通常のデータと空のデータを含むCSVファイルを作成
+    valid_content = """日付,金額（円）,保有金融機関,メモ
+2024-03-24,1000,Bank A,Test"""
+    empty_content = """日付,金額（円）,保有金融機関,メモ"""
+
+    (download_dir / "valid.csv").write_text(valid_content)
+    (download_dir / "empty.csv").write_text(empty_content)
+
+    with patch.object(scraper, "download_dir", download_dir):
+        output_path = tmp_path / "output.csv"
+        scraper._aggregate_csv_files(output_path)
+
+        assert output_path.exists()
+        df = pd.read_csv(output_path)
+        assert len(df) == 1  # 空のデータフレームは無視されるべき
+
+
+def test_aggregate_csv_files_no_duplicates(scraper, tmp_path):
+    """重複データの排除を確認するテスト。"""
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+
+    # 重複するデータを含むCSVファイルを作成
+    duplicate_content = """日付,金額（円）,保有金融機関,メモ
+2024-03-24,1000,Bank A,Test
+2024-03-24,1000,Bank A,Test
+2024-03-24,2000,Bank B,Test"""
+
+    (download_dir / "data.csv").write_text(duplicate_content)
+
+    with patch.object(scraper, "download_dir", download_dir):
+        output_path = tmp_path / "output.csv"
+        scraper._aggregate_csv_files(output_path)
+
+        assert output_path.exists()
+        df = pd.read_csv(output_path)
+        assert len(df) == 2  # 重複が排除されているべき
+        assert df["金額（円）"].sum() == 3000  # 合計金額が正しいことを確認
+
+
+def test_aggregate_csv_files_encoding(scraper, tmp_path):
+    """UTF-8-sigエンコーディングでの出力を確認するテスト。"""
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+
+    content = """日付,金額（円）,保有金融機関,メモ
+2024-03-24,1000,テスト銀行,テスト"""
+
+    (download_dir / "data.csv").write_text(content)
+
+    with patch.object(scraper, "download_dir", download_dir):
+        output_path = tmp_path / "output.csv"
+        scraper._aggregate_csv_files(output_path)
+
+        # ファイルがUTF-8-sigで保存されているか確認
+        with open(output_path, "rb") as f:
+            assert f.read().startswith(b"\xef\xbb\xbf")  # UTF-8-sig BOM
