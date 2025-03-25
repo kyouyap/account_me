@@ -115,4 +115,6 @@ class Settings(BaseSettings):
 
 
 # シングルトンインスタンス
-settings = Settings.load_from_yaml(Path("config/settings.yaml"))
+settings = Settings.load_from_yaml(
+    Path(__file__).parent.parent.parent / "config/settings.yaml"
+)
