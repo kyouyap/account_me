@@ -1,66 +1,31 @@
-name: Test
+name: Run Tests and Static Checks
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
 
 jobs:
-  coverage:
+  build-and-test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        python-version: ["3.13"]
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Ensure config/settings.yaml
-        run: |
-          mkdir -p config
-          if [ ! -f config/settings.yaml ]; then
-            cat <<'EOF' > config/settings.yaml
-moneyforward:
-  base_url: "http://example.com"
-  endpoints:
-    login: "/login"
-spreadsheet:
-  sheet_id: "dummy_sheet"
-  range: "A1:Z100"
-paths:
-  downloads: "/tmp/downloads"
-  outputs: "/tmp/outputs"
-EOF
-          fi
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Setup Python ${{ matrix.python-version }} with uv
-        uses: ./.github/actions/setup-python-with-uv
-        with:
-          python-version: ${{ matrix.python-version }}
+    - name: Build Docker image
+      run: |
+        docker build -t my-app:latest .
 
-      - name: Run pytest
-        run: |
-          set -o pipefail
-          uv run pytest --junitxml=pytest.xml | tee pytest-coverage.txt
+    - name: Run tests in Docker container
+      run: |
+        docker run --rm -e PYTHONPATH=src my-app:latest pytest test/
 
-      - name: Pytest coverage comment
-        uses: MishaKav/pytest-coverage-comment@v1
-        with:
-          pytest-coverage-path: ./pytest-coverage.txt
-          junitxml-path: ./pytest.xml
+    - name: Run mypy in Docker container
+      run: |
+        docker run --rm my-app:latest mypy src test/
 
-      - name: Creating coverage folder
-        run: mkdir -p coverage
-
-      - name: Coverage Bagdge
-        uses: tj-actions/coverage-badge-py@v2
-        with:
-          output: coverage/coverage.svg
-
-      - name: Publish coverage report to coverage-badge branch
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          branch: coverage-badge
-          folder: coverage
+    - name: Run ruff in Docker container
+      run: |
+        docker run --rm my-app:latest ruff check src test/
