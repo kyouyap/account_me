@@ -63,21 +63,19 @@ class MoneyForwardScraper:
             except OSError as e:
                 logger.error("ディレクトリの操作に失敗しました %s: %s", directory, e)
 
-    def _read_csv_with_encoding(self, file_path: Path) -> pd.DataFrame:
+    def _read_csv_with_encoding(self, file_path: Path) -> pd.DataFrame | None:
         """複数のエンコーディングを試行してCSVファイルを読み込みます。
 
         Args:
             file_path: 読み込むCSVファイルのパス。
 
         Returns:
-            pd.DataFrame: 読み込んだデータフレーム。
-
-        Raises:
-            MoneyForwardError: すべてのエンコーディングで読み込みに失敗した場合。
+            pd.DataFrame | None: 読み込んだデータフレーム。読み込みに失敗した場合はNone。
         """
         # ファイルサイズチェック
         if file_path.stat().st_size == 0:
-            raise MoneyForwardError("CSVファイルが空です。")
+            logger.warning("CSVファイル '%s' が空のためスキップします", file_path)
+            return None
 
         encodings = ["utf-8", "shift-jis", "cp932"]
         errors = []
@@ -116,21 +114,19 @@ class MoneyForwardScraper:
                 )
                 errors.append(f"{encoding}: {str(e)}")
 
-        # エラー内容に応じたメッセージを表示
         if decode_errors:
-            error_details = "\n".join(decode_errors)
-            raise MoneyForwardError(
-                f"CSVファイル '{file_path}' を読み込めませんでした。対応していないエンコーディングの可能性があります。\n詳細:\n{error_details}"
+            logger.error(
+                "CSVファイル '%s' を読み込めませんでした。対応していないエンコーディングの可能性があります。\n詳細:\n%s",
+                file_path,
+                "\n".join(decode_errors),
             )
         elif errors:
-            error_details = "\n".join(errors)
-            raise MoneyForwardError(
-                f"CSVファイルの読み込みに失敗しました: \n{error_details}"
+            logger.error(
+                "CSVファイル '%s' の読み込みに失敗しました: \n%s",
+                file_path,
+                "\n".join(errors),
             )
-        else:
-            raise MoneyForwardError(
-                f"CSVファイル '{file_path}' の読み込みに失敗しました: データが空です"
-            )
+        return None
 
     def _aggregate_csv_files(self, output_path: Path) -> None:
         """CSVファイルを集約します。
@@ -141,45 +137,45 @@ class MoneyForwardScraper:
         Raises:
             MoneyForwardError: CSVファイルの集約に失敗した場合。
         """
-        try:
-            # CSVファイルを読み込んで結合
-            all_dfs: List[pd.DataFrame] = []
-            csv_files = list(self.download_dir.glob("*.csv"))
-            logger.info("集約対象のCSVファイル数: %d", len(csv_files))
 
-            for file_path in csv_files:
-                logger.info("ファイル '%s' の処理を開始", file_path)
-                df = self._read_csv_with_encoding(file_path)
+        # CSVファイルを読み込んで結合
+        all_dfs: List[pd.DataFrame] = []
+        csv_files = list(self.download_dir.glob("*.csv"))
+        logger.info("集約対象のCSVファイル数: %d", len(csv_files))
+
+        for file_path in csv_files:
+            logger.info("ファイル '%s' の処理を開始", file_path)
+            df = self._read_csv_with_encoding(file_path)
+            if df is not None:
                 if "金額（円）" in df.columns and "保有金融機関" in df.columns:
-                    # アメリカン・エキスプレスカードの金額を半額に
+                    # 金額カラムを事前に浮動小数点数型に変換
+                    df["金額（円）"] = df["金額（円）"].astype(float)
+                    # 初期設定ではアメリカン・エキスプレスカードの金額を半額に
                     for rule in settings.moneyforward.special_rules:
                         if rule.action == "divide_amount":
-                            # 警告を防ぐため、明示的に数値型に変換
                             mask = df["保有金融機関"] == rule.institution
                             df.loc[mask, "金額（円）"] = (
-                                df.loc[mask, "金額（円）"].astype(float) / rule.value
+                                df.loc[mask, "金額（円）"] / rule.value
                             )
                 all_dfs.append(df)
 
-            if all_dfs:
-                # データを結合して重複を削除
-                final_df = pd.concat(all_dfs).drop_duplicates().reset_index(drop=True)
+        if all_dfs:
+            # データを結合して重複を削除
+            final_df = pd.concat(all_dfs).drop_duplicates().reset_index(drop=True)
 
-                # ディレクトリが存在しない場合は作成
-                output_path.parent.mkdir(parents=True, exist_ok=True)
+            # ディレクトリが存在しない場合は作成
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-                # CSVファイルとして保存
-                final_df.to_csv(output_path, index=False, encoding="utf-8-sig")
-                logger.info(
-                    "CSVファイルを集約しました: %s（レコード数: %d）",
-                    output_path,
-                    len(final_df),
-                )
-            else:
-                raise MoneyForwardError("集約するCSVファイルがありません。")
-
-        except Exception as e:
-            raise MoneyForwardError(f"CSVファイルの集約に失敗しました: {e}") from e
+            # CSVファイルとして保存
+            final_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+            logger.info(
+                "CSVファイルを集約しました: %s（レコード数: %d）",
+                output_path,
+                len(final_df),
+            )
+        else:
+            logger.warning("集約するCSVファイルがありません。")
+            return
 
     def scrape(self) -> None:
         """スクレイピングを実行します。"""

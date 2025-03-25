@@ -3,15 +3,6 @@
 ## 概要
 このプロジェクトは、従来のMoneyForwardMEを使用していた家計簿管理システムを拡張し、同棲や結婚などのライフイベントにより変化した家計状況に適応するためのカスタマイズ版です。
 
-## 依存関係
-以下はプロジェクトで使用されている主要な依存関係です：
-- `gspread-dataframe>=4.0.0`: Googleスプレッドシートとのデータ操作を簡素化
-- `python-dotenv>=1.0.1`: 環境変数の管理
-- `selenium>=4.30.0`: ウェブスクレイピングの自動化
-- `oauth2client>=4.1.3`: Google API認証
-- `pydantic>=2.10.6`: データバリデーションと型管理
-- `pydantic-settings>=2.8.1`: 設定管理
-
 ## ディレクトリ構造
 プロジェクトの主要なディレクトリ構造は以下の通りです：
 - `src/`: メインのコード
@@ -57,19 +48,54 @@
 2. 必要なディレクトリ構造を設定し、DockerのComposeファイルを作成
 
 ### 環境変数の準備
-1. src配下に.envファイルを置いて以下のようなファイルを作成
-```
-EMAIL="example@gmail.com"
-PASSWORD="example"
-SPREADSHEET_KEY="hogehoge"
-```
+1. `src` 配下に `.env` ファイルを作成し、以下のような内容で環境変数を設定
+    ```env
+    EMAIL="example@gmail.com"
+    PASSWORD="example"
+    SPREADSHEET_KEY="hogehoge"
+    ```
+2. GCPの認証キーのパスも設定ファイル（例：`config/settings.yaml`）や環境変数に記述する
 
 ### スプレッドシートの準備
 - MoneyForwardの可視化テンプレートを基に、自分用にカスタマイズしたスプレッドシートを作成
+  参考用スプレッドシート:
+  [https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0](https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0)
 
-### GCP APIキーの設定
-- Google Cloud PlatformでAPIキーを取得し、スプレッドシートとの連携を設定
-- key配下にスプレッドシートのキーを格納。
+### GCP 認証キー発行手順
+Google Sheets APIを利用してスプレッドシートの編集権限を得るため、以下のステップで認証キー（JSON）を発行します。
+
+1. **Google Cloud Consoleにアクセス**
+   - [https://console.cloud.google.com/](https://console.cloud.google.com/) にアクセスし、Googleアカウントでログインします。
+
+2. **プロジェクトの作成または選択**
+   - 新しいプロジェクトを作成するか、既存のプロジェクトを選択します。
+
+3. **Google Sheets APIの有効化**
+   - 左側のナビゲーションメニューから「APIとサービス」→「ライブラリ」を選択します。
+   - 「Google Sheets API」を検索し、有効化します。
+
+4. **認証情報の作成**
+   - 「APIとサービス」→「認証情報」に移動し、「認証情報を作成」ボタンをクリックします。
+   - 「サービス アカウント」を選択します。
+
+5. **サービスアカウントの設定**
+   - サービスアカウントの名前、ID、説明を入力します。
+     ※ガード句を利用し、不要なネストや冗長なコメントを避けながら記述してください。
+   - 「作成と続行」をクリックします。
+
+6. **ロールの割り当て**
+   - 「ロールを選択」のドロップダウンから「Google Sheets API 編集者」もしくはプロジェクトに適した編集権限のロールを選択します。
+     ※必要に応じてカスタムロールの利用も検討してください。
+   - 「続行」をクリックします。
+
+7. **サービスアカウントキーの作成**
+   - サービスアカウントが作成されたら、その詳細画面に移動し、「キー」タブを選択します。
+   - 「キーを追加」→「新しいキーを作成」を選択し、キータイプに「JSON」を指定します。
+   - 自動的にJSON形式の認証キーがダウンロードされます。
+
+8. **認証キーの配置と設定**
+   - ダウンロードしたJSONファイルを、プロジェクト内の適切なディレクトリ（例：`config/keys/`）に配置します。
+   - 設定ファイル（例：`config/settings.yaml`）または環境変数で、認証キーのパスを指定して参照できるようにします。
 
 ### 実装とテスト
 1. Seleniumを利用したMoneyForwardからのデータ取得処理を実装
@@ -78,7 +104,10 @@ SPREADSHEET_KEY="hogehoge"
 
 ### 定期実行の設定
 - Cronジョブを使用して、定期的にデータ取得からスプレッドシートの更新までを自動化
-- `docker-compose up -d`で実行し、crontabで`* */12 * * * /usr/bin/docker exec poetry-for-seleniarm python main.py`等で
+- `docker-compose up -d`で実行し、crontabで以下のようなコマンドを設定（例）：
+    ```cron
+    * */12 * * * /usr/bin/docker exec uv-for-seleniarm python main.py
+    ```
 
 ## ダッシュボードの利用
 - Googleスプレッドシートに集約されたデータを基に、家計の現状や傾向を視覚的に分析
@@ -88,3 +117,18 @@ SPREADSHEET_KEY="hogehoge"
 - 定期実行の安定性向上とエラーハンドリングの強化
 - ダッシュボードの機能拡張とカスタマイズオプションの追加
 - ユーザーフィードバックを基にした機能改善と最適化
+
+## 設定ファイル(config/settings.yaml)の編集について
+このプロジェクトの設定ファイル(config/settings.yaml)は、プロジェクト全体の各種設定が記述されていますが、以下の項目は特にユーザーの環境に合わせて変更が必要です：
+
+- **special_rules**:
+  - 例：`アメリカン・エキスプレスカード` の設定により、取引金額を半分に分割する処理（`divide_amount` と `value: 2`）が定義されています。必要に応じて変更してください。
+
+- **spreadsheet**:
+  - ワークシート名（例：`@家計簿データ 貼付` や `@資産推移 貼付`）、開始行、各列の定義は、利用するスプレッドシートの構成に合わせて編集が必要です。
+
+- **paths**:
+  - 出力先ディレクトリ、ダウンロードディレクトリ、認証情報ファイルのパスは、実際のシステム構成に合わせて確認・変更してください。
+
+> ※ 本手順では、Python 3.12およびmypy/pylint等の静的解析ツールを用いて、変数名やコメント、ガード句の使用などGoogleのエンジニアとしてのベストプラクティスに従った設計を意識しています。
+
