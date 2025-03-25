@@ -22,6 +22,9 @@ def setup_logging() -> None:
             config = yaml.safe_load(f)
             logging.config.dictConfig(config)
     else:
+        # ログディレクトリの存在を確認、なければ作成
+        log_dir = Path("/app/log")
+        log_dir.mkdir(parents=True, exist_ok=True)
         # 基本的なロギング設定
         logging.basicConfig(
             level=logging.INFO,

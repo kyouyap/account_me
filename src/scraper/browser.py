@@ -78,8 +78,13 @@ class BrowserManager:
         chrome_options.add_experimental_option("prefs", prefs)
 
         try:
+            selenium_url = os.environ.get(
+                "SELENIUM_URL", "http://localhost:4444/wd/hub"
+            )
+            if "SELENIUM_URL" not in os.environ:
+                logger.warning("SELENIUM_URL not set, using default: %s", selenium_url)
             self.driver = webdriver.Remote(
-                command_executor=os.environ["SELENIUM_URL"], options=chrome_options
+                command_executor=selenium_url, options=chrome_options
             )
         except WebDriverException as e:
             raise ScrapingError(f"WebDriverの初期化に失敗しました: {e}") from e
