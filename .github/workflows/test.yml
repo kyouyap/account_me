@@ -17,6 +17,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Ensure config/settings.yaml
+        run: |
+          mkdir -p config
+          if [ ! -f config/settings.yaml ]; then
+            cat <<'EOF' > config/settings.yaml
+moneyforward:
+  base_url: "http://example.com"
+  endpoints:
+    login: "/login"
+spreadsheet:
+  sheet_id: "dummy_sheet"
+  range: "A1:Z100"
+paths:
+  downloads: "/tmp/downloads"
+  outputs: "/tmp/outputs"
+EOF
+          fi
 
       - name: Setup Python ${{ matrix.python-version }} with uv
         uses: ./.github/actions/setup-python-with-uv
