@@ -15,7 +15,7 @@ def setup_logging() -> None:
     YAMLファイルからロギング設定を読み込み、適用する。
     ファイルが存在しない場合は基本的な設定を使用する。
     """
-    config_path = Path("/app/config/logging.yaml")
+    config_path = Path(__file__).parent.parent.parent / "config/logging.yaml"
     log_dir = Path("/app/log")
     log_dir.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
