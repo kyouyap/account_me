@@ -217,9 +217,8 @@ class FileDownloader:
             except Exception as e:
                 error_msg = str(e)
                 logger.error(
-                    "ファイルのダウンロードに失敗しました - リンク: %s, エラー: %s, 成功済みファイル数: %d",
+                    "ファイルのダウンロードに失敗しました - リンク: %s, 成功済みファイル数: %d",
                     link,
-                    error_msg,
                     len(downloaded_files),
                 )
                 # ダウンロードの試行を続行
