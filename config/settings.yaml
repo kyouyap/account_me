@@ -60,3 +60,4 @@ paths:
       assets: "/app/outputs/aggregated_files/assets"
   downloads: "/app/downloads"
   credentials: "/app/key/spreadsheet_managementkey.json"
+  chrome_driver: "/usr/bin/chromedriver"

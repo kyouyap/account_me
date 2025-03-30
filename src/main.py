@@ -1,12 +1,13 @@
-"""MoneyForwardスクレイピングメインモジュール。"""
+"""MoneyForwardスクレイピングとBigQueryロードを行うメインモジュール。"""
 
 import logging
 import time
+from pathlib import Path
 
 from config.logging_config import setup_logging
 from exceptions.custom_exceptions import MoneyForwardError
+from load.bigquery_loader import BigQueryLoader
 from scraper.scraper import MoneyForwardScraper
-from spreadsheet.sync import SpreadsheetSync
 
 # ロギング設定
 setup_logging()
@@ -26,11 +27,25 @@ def main() -> None:
         scraper.scrape()
         logger.info("スクレイピングが完了しました。")
 
-        # スプレッドシートの同期
-        logger.info("スプレッドシートの同期を開始します。")
-        sync = SpreadsheetSync()
-        sync.sync()
-        logger.info("スプレッドシートの同期が完了しました。")
+        # BigQueryへのデータロード
+        logger.info("BigQueryへのデータロードを開始します。")
+        loader = BigQueryLoader()
+
+        # 取引データのロード
+        detail_file = Path("outputs/aggregated_files/detail/detail_latest.csv")
+        if detail_file.exists():
+            if loader.load_transactions(detail_file):
+                logger.info("取引データのロードが完了しました。")
+            else:
+                logger.error("取引データのロードに失敗しました。")
+
+        # 資産データのロード
+        assets_file = Path("outputs/aggregated_files/assets/assets_latest.csv")
+        if assets_file.exists():
+            if loader.load_assets(assets_file):
+                logger.info("資産データのロードが完了しました。")
+            else:
+                logger.error("資産データのロードに失敗しました。")
 
     except MoneyForwardError as e:
         logger.error("処理中にエラーが発生しました: %s", e)

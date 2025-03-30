@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    volumes:
+      - ./outputs:/app/outputs
+      - ./log:/app/log
+    env_file:
+      - .env
+    environment:
+      - MONEYFORWARD_EMAIL=${EMAIL}
+      - MONEYFORWARD_PASSWORD=${PASSWORD}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CHROME_DRIVER_PATH=/usr/bin/chromedriver
+      - CHROME_PATH=/usr/bin/chromium
+    ports:
+      - "9222:9222"  # Chrome remote debugging port

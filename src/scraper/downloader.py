@@ -221,6 +221,9 @@ class FileDownloader:
                     link,
                     len(downloaded_files),
                 )
+                logger.error(
+                    "エラーの詳細: %s", error_msg
+                )
                 # ダウンロードの試行を続行
                 continue
 
