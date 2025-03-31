@@ -5,9 +5,10 @@ FROM ghcr.io/astral-sh/uv:$UV_VERSION AS uv
 
 FROM mcr.microsoft.com/vscode/devcontainers/python:3.13
 
-# コンテナ内に.venvを作らないようにする環境変数
+# 環境変数の設定
 ENV UV_PROJECT_ENVIRONMENT='/usr/local/'
 ENV UV_SYSTEM_PYTHON=1
+ENV APP_BASE_DIR=/opt
 
 # バージョンを指定してuvをコピー
 COPY --from=uv /uv /bin/uv
@@ -22,4 +23,3 @@ COPY . /opt
 RUN uv sync
 
 CMD [ "uv", "run", "pytest", "-s" ]
-

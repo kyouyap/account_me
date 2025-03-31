@@ -1,6 +1,7 @@
 """ロギング設定のテスト。"""
 
 import logging
+import os
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
@@ -8,6 +9,18 @@ import pytest
 import yaml
 
 from src.config.logging_config import setup_logging
+
+
+@pytest.fixture(autouse=True)
+def setup_env():
+    """テスト用の環境変数を設定する。"""
+    original_value = os.environ.get("APP_BASE_DIR")
+    os.environ["APP_BASE_DIR"] = "/app"
+    yield
+    if original_value is None:
+        del os.environ["APP_BASE_DIR"]
+    else:
+        os.environ["APP_BASE_DIR"] = original_value
 
 
 @pytest.fixture
