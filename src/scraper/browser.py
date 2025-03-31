@@ -106,7 +106,7 @@ class BrowserManager:
         chrome_options.add_argument("--lang=ja")  # 日本語に設定
         chrome_options.add_argument("--window-size=1920x1080")
         chrome_options.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         )
 
         # ダウンロード設定
