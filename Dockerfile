@@ -1,19 +1,68 @@
-ARG UV_VERSION=latest
+FROM python:3.11-slim-bullseye
 
-FROM ghcr.io/astral-sh/uv:$UV_VERSION AS uv
+# 環境変数の設定
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CHROME_DRIVER_PATH=/usr/bin/chromedriver
+ENV CHROME_PATH=/usr/bin/chromium
 
+# ベース依存関係のインストール
+# hadolint ignore=DL3008,DL3015
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    xvfb \
+    libgconf-2-4 \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    fonts-ipafont-gothic \
+    fonts-ipafont-mincho \
+    && rm -rf /var/lib/apt/lists/*
 
-FROM mcr.microsoft.com/vscode/devcontainers/python:3.13
+# ChromiumとChromeDriverのインストール（ARM64対応）
+# hadolint ignore=DL3008,DL3009,DL3015,DL4006
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        # ARM64用のChromiumとChromeDriver
+        apt-get update && apt-get install -y chromium chromium-driver; \
+    else \
+        # x86_64用のChrome
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+        echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
+        apt-get update && \
+        apt-get install -y google-chrome-stable chromium-driver; \
+    fi
 
-# コンテナ内に.venvを作らないようにする環境変数
-ENV UV_PROJECT_ENVIRONMENT='/usr/local/'
-ENV UV_SYSTEM_PYTHON=1
+# バージョン確認とログ出力（ARM64対応）
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        chromium --version && chromedriver --version; \
+    else \
+        google-chrome --version && chromedriver --version; \
+    fi
 
-# バージョンを指定してuvをコピー
-COPY --from=uv /uv /bin/uv
+# 作業ディレクトリの設定
+WORKDIR /app
 
-WORKDIR /opt
+# アプリケーションコードのコピー
+COPY . /app
 
-COPY pyproject.toml uv.lock /opt/
+# コンテナ内の仮想環境のパスを設定
+ENV UV_PROJECT_ENVIRONMENT='/app/.venv'
 
+# uvのインストール
+# hadolint ignore=DL3013
+RUN pip install --no-cache-dir -U pip \
+    && pip install --no-cache-dir -U uv \
+    && mkdir -p /app/.venv  # 仮想環境ディレクトリを作成
+
+# Pythonパッケージのインストール
 RUN uv sync
+
+# 出力ディレクトリの作成
+RUN mkdir -p /app/downloads \
+    && mkdir -p /app/outputs/aggregated_files/detail \
+    && mkdir -p /app/outputs/aggregated_files/assets \
+    && mkdir -p /app/log
+
+# # エントリーポイントの設定
+# CMD ["python", "src/main.py"]

@@ -30,9 +30,13 @@ def test_init(browser_manager):
 
 def test_context_manager(browser_manager):
     """コンテキストマネージャーのテスト。"""
-    with patch("selenium.webdriver.Remote") as mock_remote:
+    with (
+        patch("selenium.webdriver.Chrome") as mock_chrome,
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("os.path.exists", return_value=True),
+    ):
         mock_driver = MagicMock()
-        mock_remote.return_value = mock_driver
+        mock_chrome.return_value = mock_driver
 
         with browser_manager as manager:
             assert manager.driver is not None
@@ -46,24 +50,26 @@ def test_context_manager(browser_manager):
 def test_setup_driver_success(browser_manager):
     """WebDriver設定の成功テスト。"""
     with (
-        patch("selenium.webdriver.Remote") as mock_remote,
-        patch.dict("os.environ", {"SELENIUM_URL": "http://localhost:4444"}),
+        patch("selenium.webdriver.Chrome") as mock_chrome,
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("os.path.exists", return_value=True),
     ):
         mock_driver = MagicMock()
-        mock_remote.return_value = mock_driver
+        mock_chrome.return_value = mock_driver
 
         browser_manager.setup_driver()
         assert browser_manager.driver is not None
-        mock_remote.assert_called_once()
+        mock_chrome.assert_called_once()
 
 
 def test_setup_driver_failure(browser_manager):
     """WebDriver設定の失敗テスト。"""
     with (
-        patch("selenium.webdriver.Remote") as mock_remote,
-        patch.dict("os.environ", {"SELENIUM_URL": "http://localhost:4444"}),
+        patch("selenium.webdriver.Chrome") as mock_chrome,
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("os.path.exists", return_value=True),
     ):
-        mock_remote.side_effect = WebDriverException("接続エラー")
+        mock_chrome.side_effect = WebDriverException("接続エラー")
 
         with pytest.raises(ScrapingError) as exc_info:
             browser_manager.setup_driver()

@@ -88,6 +88,7 @@ class PathSettings(BaseModel):
     outputs: OutputsSettings
     downloads: str
     credentials: str
+    chrome_driver: str
 
 
 class Settings(BaseSettings):
