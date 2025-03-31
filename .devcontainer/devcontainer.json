@@ -1,9 +1,9 @@
 {
     "name": "account_me",
-    "dockerComposeFile": [
-        "../compose.yaml"
-    ],
-    "service": "app",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
     "workspaceFolder": "/app",
     "features": {
         "ghcr.io/dhoeric/features/hadolint:1": {}
@@ -45,5 +45,12 @@
         }
     },
     "postStartCommand": "uv run pre-commit install;",
-    "remoteUser": "vscode"
+    "remoteUser": "root",
+    "runArgs": [
+        "--cap-add=SYS_ADMIN",
+        "--env-file",
+        ".env"
+    ],
+    "containerUser": "root",
+    "updateContentCommand": "chown -R root:root /app"
 }

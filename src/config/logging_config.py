@@ -2,6 +2,7 @@
 
 import logging
 import logging.config
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -15,8 +16,9 @@ def setup_logging() -> None:
     YAMLファイルからロギング設定を読み込み、適用する。
     ファイルが存在しない場合は基本的な設定を使用する。
     """
-    config_path = Path(__file__).parent.parent.parent / "config/logging.yaml"
-    log_dir = Path("/app/log")
+    base_dir = Path(os.getenv("APP_BASE_DIR", "/app"))
+    config_path = base_dir / "config/logging.yaml"
+    log_dir = base_dir / "log"
     log_dir.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
@@ -30,7 +32,7 @@ def setup_logging() -> None:
             handlers=[
                 logging.StreamHandler(),
                 RotatingFileHandler(
-                    filename="/app/log/app.log",
+                    filename=str(log_dir / "app.log"),
                     maxBytes=5 * 1024 * 1024,  # 5MB
                     backupCount=5,
                     encoding="utf-8",

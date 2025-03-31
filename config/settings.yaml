@@ -53,6 +53,7 @@ spreadsheet:
           col: 4
 
 paths:
+  chrome_driver: "/usr/local/bin/chromedriver"
   outputs:
     base: "/app/outputs"
     aggregated_files:

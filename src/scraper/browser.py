@@ -14,6 +14,7 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -70,6 +71,45 @@ class BrowserManager:
     def setup_driver(self) -> None:
         """ChromeDriverを設定。"""
         chrome_options = Options()
+        # ChromeDriverのパス設定
+        chrome_driver_path = os.getenv(
+            "CHROME_DRIVER_PATH", settings.paths.chrome_driver
+        )
+        if not os.path.exists(chrome_driver_path):
+            raise ScrapingError(f"ChromeDriverが見つかりません: {chrome_driver_path}")
+
+        # ChromeバイナリのPATH設定
+        chrome_path = os.getenv("CHROME_PATH", "/usr/bin/chromium")
+        if not os.path.exists(chrome_path):
+            raise ScrapingError(f"Chromeバイナリが見つかりません: {chrome_path}")
+        chrome_options.binary_location = chrome_path
+
+        # ヘッドレスモードとセキュリティ設定
+        chrome_options.add_argument("--headless=new")  # 新しいヘッドレスモード
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--disable-gpu")  # GPUを無効化
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument("--disable-extensions")  # 拡張機能を無効化
+        chrome_options.add_argument("--disable-infobars")  # 情報バーを無効化
+        chrome_options.add_argument(
+            "--disable-popup-blocking"
+        )  # ポップアップブロックを無効化
+        chrome_options.add_argument(
+            "--disable-application-cache"
+        )  # アプリケーションキャッシュを無効化
+        chrome_options.add_argument("--disable-web-security")  # セキュリティを無効化
+        chrome_options.add_argument(
+            "--allow-running-insecure-content"
+        )  # 不正なコンテンツを許可
+        chrome_options.add_argument("--lang=ja")  # 日本語に設定
+        chrome_options.add_argument("--window-size=1920x1080")
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
+
+        # ダウンロード設定
         prefs = {
             "profile.default_content_settings.popups": 0,
             "download.default_directory": settings.paths.downloads,
@@ -78,14 +118,9 @@ class BrowserManager:
         chrome_options.add_experimental_option("prefs", prefs)
 
         try:
-            selenium_url = os.environ.get(
-                "SELENIUM_URL", "http://localhost:4444/wd/hub"
-            )
-            if "SELENIUM_URL" not in os.environ:
-                logger.warning("SELENIUM_URL not set, using default: %s", selenium_url)
-            self.driver = webdriver.Remote(
-                command_executor=selenium_url, options=chrome_options
-            )
+            # ChromeDriverを直接設定
+            service = Service(executable_path=chrome_driver_path)
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
         except WebDriverException as e:
             raise ScrapingError(f"WebDriverの初期化に失敗しました: {e}") from e
 
