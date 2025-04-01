@@ -1,0 +1,4 @@
+project_id  = "your-project-id"
+region      = "asia-northeast1"
+mf_email    = "your-email@example.com"
+mf_password = "your-password"
