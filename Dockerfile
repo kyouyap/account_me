@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bullseye
+FROM --platform=linux/amd64 python:3.11-slim-bullseye
 
 # 環境変数の設定
 ENV PYTHONUNBUFFERED=1
@@ -64,5 +64,9 @@ RUN mkdir -p /app/downloads \
     && mkdir -p /app/outputs/aggregated_files/assets \
     && mkdir -p /app/log
 
-# # エントリーポイントの設定
-# CMD ["python", "src/main.py"]
+# Pythonパスの設定
+ENV PYTHONPATH=/app/src
+
+# エントリーポイントの設定（FastAPIアプリケーションの起動）
+ENV PORT=8080
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]

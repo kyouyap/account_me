@@ -172,3 +172,12 @@ app/documents
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .ruff_cache
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform/providers/registry.terraform.io/hashicorp/google/4.85.0/darwin_arm64/terraform-provider-google_v4.85.0_x5
+terraform/.terraform/providers/registry.terraform.io/hashicorp/null/3.2.3/darwin_arm64/LICENSE.txt
+terraform/.terraform/providers/registry.terraform.io/hashicorp/null/3.2.3/darwin_arm64/terraform-provider-null_v3.2.3_x5
+terraform/.terraform.tfstate.lock.info
+terraform/.terraform.lock.hcl
+terraform.tfstate
+terraform/terraform.tfvars
