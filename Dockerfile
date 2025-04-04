@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bullseye
+FROM --platform=linux/amd64 python:3.11-slim-bullseye
 
 # 環境変数の設定
 ENV PYTHONUNBUFFERED=1
@@ -20,25 +20,11 @@ RUN apt-get update && apt-get install -y \
     fonts-ipafont-mincho \
     && rm -rf /var/lib/apt/lists/*
 
-# ChromiumとChromeDriverのインストール（ARM64対応）
+# ChromiumとChromeDriverのインストール
 # hadolint ignore=DL3008,DL3009,DL3015,DL4006
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        # ARM64用のChromiumとChromeDriver
-        apt-get update && apt-get install -y chromium chromium-driver; \
-    else \
-        # x86_64用のChrome
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-        echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
-        apt-get update && \
-        apt-get install -y google-chrome-stable chromium-driver; \
-    fi
-
-# バージョン確認とログ出力（ARM64対応）
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        chromium --version && chromedriver --version; \
-    else \
-        google-chrome --version && chromedriver --version; \
-    fi
+SHELL ["/bin/bash", "-c"]
+RUN apt-get update && \
+    apt-get install -y chromium chromium-driver; 
 
 # 作業ディレクトリの設定
 WORKDIR /app
@@ -64,5 +50,9 @@ RUN mkdir -p /app/downloads \
     && mkdir -p /app/outputs/aggregated_files/assets \
     && mkdir -p /app/log
 
-# # エントリーポイントの設定
-# CMD ["python", "src/main.py"]
+# Pythonパスの設定
+ENV PYTHONPATH=/app/src
+
+# エントリーポイントの設定（FastAPIアプリケーションの起動）
+ENV PORT=8080
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
