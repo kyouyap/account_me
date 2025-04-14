@@ -26,3 +26,9 @@ variable "service_name" {
   type        = string
   default     = "moneyforward-etl"
 }
+
+variable "spreadsheet_key" {
+  description = "Google Spreadsheetのキー"
+  type        = string
+  sensitive   = true
+}

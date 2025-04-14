@@ -1,12 +1,8 @@
 {
-    "name": "account_me",
+    "name": "Account Me Development",
     "build": {
         "dockerfile": "../Dockerfile",
         "context": ".."
-    },
-    "workspaceFolder": "/app",
-    "features": {
-        "ghcr.io/dhoeric/features/hadolint:1": {}
     },
     "customizations": {
         "vscode": {
@@ -17,40 +13,11 @@
                 "kevinrose.vsc-python-indent",
                 "mosapride.zenkaku",
                 "ms-python.python",
-                "oderwat.indent-rainbow",
-                "shardulm94.trailing-spaces",
-                "usernamehw.errorlens",
+                "ms-python.vscode-pylance",
                 "saoudrizwan.claude-dev",
-                "ms-python.mypy-type-checker"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "[python]": {
-                    "editor.defaultFormatter": "charliermarsh.ruff",
-                    "editor.codeActionsOnSave": {
-                        "source.fixAll.ruff": "explicit",
-                        "source.organizeImports.ruff": "explicit"
-                    },
-                    "editor.formatOnSave": true
-                },
-                "files.insertFinalNewline": true,
-                "files.trimTrailingWhitespace": true,
-                "terminal.integrated.defaultProfile.linux": "zsh",
-                "terminal.integrated.profiles.linux": {
-                    "zsh": {
-                        "path": "/bin/zsh"
-                    }
-                }
-            }
+                "donjayamanne.python-extension-pack"
+            ]
         }
     },
-    "postStartCommand": "uv run pre-commit install;",
-    "remoteUser": "root",
-    "runArgs": [
-        "--cap-add=SYS_ADMIN",
-        "--env-file",
-        ".env"
-    ],
-    "containerUser": "root",
-    "updateContentCommand": "chown -R root:root /app"
-}
+    "remoteUser": "root"
+} 

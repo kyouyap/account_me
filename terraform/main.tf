@@ -1,12 +1,9 @@
 # APIの有効化
 locals {
   required_apis = [
-    "run.googleapis.com",
     "storage.googleapis.com",
     "bigquery.googleapis.com",
-    "cloudscheduler.googleapis.com",
-    "secretmanager.googleapis.com",
-    "artifactregistry.googleapis.com"
+    "secretmanager.googleapis.com"
   ]
 }
 
@@ -26,7 +23,6 @@ resource "google_service_account" "sa" {
 
 resource "google_project_iam_member" "sa_roles" {
   for_each = toset([
-    "roles/run.invoker",
     "roles/storage.objectCreator",
     "roles/bigquery.dataEditor",
     "roles/secretmanager.secretAccessor"
@@ -63,6 +59,20 @@ resource "google_secret_manager_secret_version" "mf_password" {
   secret_data = var.mf_password
 }
 
+# Spreadsheet Key Secret
+resource "google_secret_manager_secret" "spreadsheet_key" {
+  secret_id = "spreadsheet-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "spreadsheet_key" {
+  secret      = google_secret_manager_secret.spreadsheet_key.id
+  secret_data = var.spreadsheet_key
+}
+
 # Storage
 resource "google_storage_bucket" "raw_data" {
   name          = "mf-raw-data-${var.project_id}"
@@ -77,81 +87,4 @@ resource "google_bigquery_dataset" "moneyforward" {
   dataset_id    = "moneyforward"
   friendly_name = "MoneyForward Dataset"
   location      = var.region
-}
-
-# Artifact Registry
-resource "google_artifact_registry_repository" "repo" {
-  repository_id = var.service_name
-  format        = "DOCKER"
-  location      = var.region
-  depends_on    = [google_project_service.apis]
-}
-
-# Dockerイメージのビルドとプッシュ
-resource "null_resource" "docker_build_push" {
-  triggers = {
-    dockerfile_hash = filemd5("${path.root}/../Dockerfile")
-    # ソースコードの変更も検知する
-    source_hash = filemd5("${path.root}/../src/main.py")
-  }
-
-  provisioner "local-exec" {
-    command = <<EOF
-      docker build --platform linux/amd64 -t ${var.region}-docker.pkg.dev/${var.project_id}/${var.service_name}/scraper:v1 ../ && \
-      gcloud auth configure-docker ${var.region}-docker.pkg.dev && \
-      docker push ${var.region}-docker.pkg.dev/${var.project_id}/${var.service_name}/scraper:v1
-    EOF
-  }
-
-  depends_on = [google_artifact_registry_repository.repo]
-}
-
-# Cloud Run
-resource "google_cloud_run_service" "service" {
-  name     = var.service_name
-  location = var.region
-
-  template {
-    metadata {
-      annotations = {
-        "run.googleapis.com/startup-cpu-boost" = "true"
-      }
-    }
-    spec {
-      service_account_name = google_service_account.sa.email
-      timeout_seconds      = 1800
-      containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.service_name}/scraper:v1"
-        resources {
-          limits = {
-            memory = "2Gi"
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [
-    google_project_service.apis,
-    null_resource.docker_build_push
-  ]
-}
-
-# Cloud Scheduler
-resource "google_cloud_scheduler_job" "job" {
-  name        = "${var.service_name}-daily"
-  description = "Daily MoneyForward ETL Pipeline"
-  schedule    = "0 1 * * *"
-  time_zone   = "Asia/Tokyo"
-
-  http_target {
-    http_method = "POST"
-    uri         = google_cloud_run_service.service.status[0].url
-
-    oidc_token {
-      service_account_email = google_service_account.sa.email
-    }
-  }
-
-  depends_on = [google_project_service.apis]
 }

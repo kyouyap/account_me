@@ -31,7 +31,7 @@ class MoneyForwardScraper:
         Raises:
             MoneyForwardError: 必要な環境変数が設定されていない場合。
         """
-        required_vars = ["EMAIL", "PASSWORD", "SELENIUM_URL"]
+        required_vars = ["EMAIL", "PASSWORD"]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
             raise MoneyForwardError(
