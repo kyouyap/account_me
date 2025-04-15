@@ -1,9 +1,8 @@
 {
     "name": "Account Me Development",
-    "build": {
-        "dockerfile": "../Dockerfile",
-        "context": ".."
-    },
+    "dockerComposeFile": ["../docker-compose.yml"],
+    "service": "app",
+    "workspaceFolder": "/app",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -20,4 +19,4 @@
         }
     },
     "remoteUser": "root"
-} 
+}

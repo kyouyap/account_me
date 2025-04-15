@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     libasound2=1.2.4-1.1 \
     fonts-ipafont-gothic=00303-21 \
     fonts-ipafont-mincho=00303-21 \
+    git=1:2.30.2-1+deb11u4 \
     && rm -rf /var/lib/apt/lists/*
 
 # ChromiumとChromeDriverのインストール
@@ -33,29 +34,29 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
     apt-get install -y chromium=120.0.6099.224-1~deb11u1 chromium-driver=120.0.6099.224-1~deb11u1; 
 
-# 作業ディレクトリの設定
+# 最初に作業ディレクトリを設定
 WORKDIR /app
-
-# アプリケーションコードのコピー
-COPY . /app
 
 ENV UV_PROJECT_ENVIRONMENT='/usr/local/'
 ENV UV_SYSTEM_PYTHON=1
 
-WORKDIR /opt/
-
-# バージョンを指定してuvをコピー
+# 依存関係のインストール用にtemporaryで/optに移動
+WORKDIR /opt
 COPY --from=uv /uv /bin/uv
-
-COPY pyproject.toml uv.lock /opt/
-
+COPY pyproject.toml uv.lock ./
 RUN uv sync
+
+# 作業ディレクトリを/appに戻す
+WORKDIR /app
 
 # 出力ディレクトリの作成
 RUN mkdir -p /app/downloads \
     && mkdir -p /app/outputs/aggregated_files/detail \
     && mkdir -p /app/outputs/aggregated_files/assets \
-    && mkdir -p /app/log
+    && mkdir -p /app/log \
+    && chmod -R 777 /app/downloads \
+    && chmod -R 777 /app/outputs \
+    && chmod -R 777 /app/log
 
 # Pythonパスの設定
 ENV PYTHONPATH=/app/src
