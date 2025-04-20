@@ -24,6 +24,10 @@ class MoneyForwardScraper:
         self.download_dir = Path(settings.paths.downloads)
         self.browser_manager = BrowserManager()
         self.file_downloader = FileDownloader(self.download_dir)
+        
+        # シークレットを環境変数に設定
+        from config.secrets import get_secrets
+        get_secrets()
 
     def _check_env_variables(self) -> None:
         """必要な環境変数が設定されているか確認します。

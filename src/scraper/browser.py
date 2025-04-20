@@ -22,7 +22,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from config.settings import settings
-from exceptions.custom_exceptions import AuthenticationError, ScrapingError
+from exceptions.custom_exceptions import (
+    AuthenticationError,
+    GmailApiError,
+    ScrapingError,
+    VerificationCodeError,
+)
+from scraper.gmail_client import GmailClient
 
 logger = logging.getLogger(__name__)
 
@@ -217,12 +223,35 @@ class BrowserManager:
             password_input.send_keys(password)
             password_input.submit()
 
+            # 2段階認証の確認
+            try:
+                code_input = self.wait_and_find_element(By.NAME, "mfid_user[otp_attempt]", timeout=3)  # type: ignore
+                logger.info("2段階認証が要求されました")
+                
+                # Gmail APIで認証コードを取得
+                gmail_client = GmailClient()
+                verification_code = gmail_client.get_verification_code()
+                logger.info("認証コードを取得しました")
+                
+                # 認証コードを入力
+                code_input.send_keys(verification_code)
+                code_input.submit()
+                logger.info("認証コードを送信しました")
+            except TimeoutException:
+                logger.info("2段階認証は要求されませんでした")
+
+            # デバッグのためにpage_sourceを保存
+            with open("page_source.html", "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
+
             # ログイン成功の確認
             self.wait_and_find_element(By.CLASS_NAME, "accounts")  # type: ignore
             logger.info("MoneyForwardへのログインが完了しました。ユーザー: %s", email)
 
         except (ScrapingError, TimeoutException) as e:
             raise AuthenticationError("ログインに失敗しました。") from e
+        except (GmailApiError, VerificationCodeError) as e:
+            raise AuthenticationError(f"2段階認証に失敗しました: {e}") from e
 
     def get_links_for_download(self, page_url: str) -> List[str]:
         """指定されたページからダウンロードリンクを抽出。
