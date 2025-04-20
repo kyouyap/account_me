@@ -76,19 +76,26 @@ class BrowserManager:
 
     def setup_driver(self) -> None:
         """ChromeDriverを設定。"""
+        logger.info("ブラウザドライバの設定を開始")
         chrome_options = Options()
+        
         # ChromeDriverのパス設定
         chrome_driver_path = os.getenv(
             "CHROME_DRIVER_PATH", settings.paths.chrome_driver
         )
+        logger.info("ChromeDriverパス: %s", chrome_driver_path)
         if not os.path.exists(chrome_driver_path):
+            logger.error("ChromeDriverが見つかりません: %s", chrome_driver_path)
             raise ScrapingError(f"ChromeDriverが見つかりません: {chrome_driver_path}")
 
         # ChromeバイナリのPATH設定
         chrome_path = os.getenv("CHROME_PATH", "/usr/bin/chromium")
+        logger.info("Chromeバイナリパス: %s", chrome_path)
         if not os.path.exists(chrome_path):
+            logger.error("Chromeバイナリが見つかりません: %s", chrome_path)
             raise ScrapingError(f"Chromeバイナリが見つかりません: {chrome_path}")
         chrome_options.binary_location = chrome_path
+        logger.info("Chromeバイナリの設定が完了")
 
         # ヘッドレスモードとセキュリティ設定
         chrome_options.add_argument("--headless=new")  # 新しいヘッドレスモード
@@ -124,11 +131,19 @@ class BrowserManager:
         chrome_options.add_experimental_option("prefs", prefs)
 
         try:
-            # ChromeDriverを直接設定
+            logger.info("ChromeDriverサービスを初期化")
             service = Service(executable_path=chrome_driver_path)
+            
+            logger.info("WebDriverを初期化")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            logger.info("WebDriverの初期化が完了")
+            
         except WebDriverException as e:
+            logger.error("WebDriverの初期化に失敗: %s", e, exc_info=True)
             raise ScrapingError(f"WebDriverの初期化に失敗しました: {e}") from e
+        except Exception as e:
+            logger.error("予期せぬエラーが発生: %s", e, exc_info=True)
+            raise ScrapingError(f"ブラウザの設定中に予期せぬエラーが発生: {e}") from e
 
     def wait_and_find_element(
         self, by: By, value: str, timeout: Optional[int] = None
@@ -150,16 +165,24 @@ class BrowserManager:
             raise ScrapingError("WebDriverが初期化されていません。")
 
         timeout = timeout or self.timeout
+        logger.info("要素の検索を開始: %s=%s（タイムアウト: %d秒）", by, value, timeout)
         try:
+            logger.debug("要素の待機を開始")
             element: Optional[WebElement] = WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((self._by_mapping[by], value))  # type: ignore
             )
             if not element:
+                logger.error("要素が見つかりませんでした: %s=%s", by, value)
                 raise ScrapingError(f"要素が見つかりませんでした: {by}={value}")
+            logger.info("要素が見つかりました: %s=%s", by, value)
             return element
         except TimeoutException as e:
+            logger.error("要素の待機がタイムアウト: %s=%s", by, value)
+            if self.driver:
+                logger.debug("現在のページソース: %s", self.driver.page_source)
             raise ScrapingError(f"要素が見つかりませんでした: {by}={value}") from e
         except KeyError as e:
+            logger.error("無効な検索方法が指定されました: %s", by)
             raise ScrapingError(f"無効な検索方法です: {by}") from e
 
     def retry_operation(self, operation, *args, **kwargs):
@@ -195,6 +218,47 @@ class BrowserManager:
                     continue
         raise ScrapingError(f"操作が{self.retry_count}回失敗しました: {last_error}")
 
+    def wait_for_new_verification_email(
+        self, gmail_client: GmailClient, last_email_id: Optional[str] = None
+    ) -> str:
+        """新しい認証メールの到着を待機。
+
+        Args:
+            gmail_client: GmailClientインスタンス
+            last_email_id: 前回取得したメールID
+
+        Returns:
+            str: 新しいメールID
+
+        Raises:
+            VerificationCodeError: 待機タイムアウト時
+        """
+        max_attempts = 10  # 最大待機回数
+        wait_seconds = 3   # 待機間隔（秒）
+        
+        for attempt in range(max_attempts):
+            try:
+                # 新しいメールを検索
+                email_id = gmail_client.get_latest_verification_email_id()
+                
+                # 新しいメールが来ているか確認
+                if last_email_id is None or email_id != last_email_id:
+                    logger.info("新しい認証メールを検出: %s", email_id)
+                    return email_id
+                    
+                logger.info(
+                    "メールの到着を待機中... 試行回数: %d/%d",
+                    attempt + 1,
+                    max_attempts
+                )
+                time.sleep(wait_seconds)
+                
+            except Exception as e:
+                logger.warning("メール検索中にエラー: %s", e)
+                time.sleep(wait_seconds)
+                
+        raise VerificationCodeError("新しい認証メールの到着待機がタイムアウトしました")
+
     def login(self, email: str, password: str) -> None:
         """MoneyForwardにログイン。
 
@@ -214,44 +278,104 @@ class BrowserManager:
             logger.info("MoneyForwardログインページにアクセスしています: %s", url)
 
             # メールアドレス入力
+            logger.info("メールアドレス入力フォームを探索中")
             email_input = self.wait_and_find_element(By.NAME, "mfid_user[email]")  # type: ignore
+            logger.info("メールアドレスを入力: %s", email)
             email_input.send_keys(email)
+            logger.info("メールアドレスフォームを送信")
             email_input.submit()
+            logger.info("メールアドレス送信完了")
 
             # パスワード入力
+            logger.info("パスワード入力フォームを探索中")
             password_input = self.wait_and_find_element(By.NAME, "mfid_user[password]")  # type: ignore
+            logger.debug("パスワードを入力")
             password_input.send_keys(password)
+            logger.info("パスワードフォームを送信")
             password_input.submit()
+            logger.info("パスワード送信完了")
 
             # 2段階認証の確認
             try:
-                code_input = self.wait_and_find_element(By.NAME, "mfid_user[otp_attempt]", timeout=3)  # type: ignore
-                logger.info("2段階認証が要求されました")
+                logger.info("2段階認証フォームの有無を確認")
+                try:
+                    code_input = self.wait_and_find_element(By.NAME, "email_otp", timeout=3)  # type: ignore
+                    logger.info("2段階認証が要求されました")
+                except ScrapingError:
+                    try:
+                        # 古い形式の2段階認証フォームを試行
+                        code_input = self.wait_and_find_element(By.NAME, "mfid_user[otp_attempt]", timeout=3)  # type: ignore
+                        logger.info("古い形式の2段階認証フォームが見つかりました")
+                    except ScrapingError as e:
+                        logger.error("2段階認証フォームが見つかりません: %s", e)
+                        if self.driver:
+                            logger.debug("現在のページソース: %s", self.driver.page_source)
+                        raise
                 
-                # Gmail APIで認証コードを取得
+                # Gmail APIクライアントを初期化
+                logger.info("Gmail APIクライアントを初期化")
                 gmail_client = GmailClient()
-                verification_code = gmail_client.get_verification_code()
-                logger.info("認証コードを取得しました")
                 
-                # 認証コードを入力
+                # 現在の最新メールIDを取得
+                logger.info("現在の最新メールIDを取得")
+                last_email_id = gmail_client.get_latest_verification_email_id()
+                
+                # 送信後の新しいメールを待機
+                logger.info("新しい認証メールの到着を待機")
+                new_email_id = self.wait_for_new_verification_email(gmail_client, last_email_id)
+                
+                # 新しいメールから認証コードを取得
+                logger.info("新しいメールから認証コードを取得")
+                verification_code = gmail_client.get_verification_code_by_id(new_email_id)
+                logger.info("認証コードを取得しました: %s", verification_code)
+                
+                # 認証コードを入力して送信
+                logger.info("認証コードを入力: %s", verification_code)
                 code_input.send_keys(verification_code)
+                logger.info("認証コードフォームを送信")
                 code_input.submit()
-                logger.info("認証コードを送信しました")
+                logger.info("認証コードの送信完了")
             except TimeoutException:
                 logger.info("2段階認証は要求されませんでした")
 
             # デバッグのためにpage_sourceを保存
+            logger.info("現在のページソースを保存")
             with open("page_source.html", "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
+            logger.info("ページソースの保存完了")
 
             # ログイン成功の確認
+            logger.info("ログイン成功の確認を開始")
             self.wait_and_find_element(By.CLASS_NAME, "accounts")  # type: ignore
             logger.info("MoneyForwardへのログインが完了しました。ユーザー: %s", email)
 
-        except (ScrapingError, TimeoutException) as e:
-            raise AuthenticationError("ログインに失敗しました。") from e
+        except TimeoutException as e:
+            logger.error("要素待機中にタイムアウトが発生: %s", e)
+            # デバッグのためにエラー時のページソースも保存
+            if self.driver:
+                with open("error_page.html", "w", encoding="utf-8") as f:
+                    f.write(self.driver.page_source)
+                logger.info("エラー時のページソースを保存しました: error_page.html")
+            raise AuthenticationError("ログインフォームの要素が見つかりませんでした。") from e
+        except ScrapingError as e:
+            logger.error("スクレイピング中にエラーが発生: %s", e)
+            # デバッグのためにエラー時のページソースも保存
+            if self.driver:
+                with open("error_page.html", "w", encoding="utf-8") as f:
+                    f.write(self.driver.page_source)
+                logger.info("エラー時のページソースを保存しました: error_page.html")
+            raise AuthenticationError(f"ログインプロセスでエラーが発生: {e}") from e
         except (GmailApiError, VerificationCodeError) as e:
+            logger.error("2段階認証中にエラーが発生: %s", e)
             raise AuthenticationError(f"2段階認証に失敗しました: {e}") from e
+        except Exception as e:
+            logger.error("予期せぬエラーが発生: %s", e)
+            # デバッグのためにエラー時のページソースも保存
+            if self.driver:
+                with open("error_page.html", "w", encoding="utf-8") as f:
+                    f.write(self.driver.page_source)
+                logger.info("エラー時のページソースを保存しました: error_page.html")
+            raise AuthenticationError(f"ログイン処理中に予期せぬエラーが発生: {e}") from e
 
     def get_links_for_download(self, page_url: str) -> List[str]:
         """指定されたページからダウンロードリンクを抽出。

@@ -173,11 +173,13 @@ class FileDownloader:
                     )
                     today_button.click()
 
-                    # 過去24ヶ月分のデータをダウンロード
-                    for j in range(12):
+                    # 設定された月数分のデータをダウンロード
+                    months = settings.moneyforward.history.months_to_download
+                    for j in range(months):
                         logger.info(
-                            "過去のデータをダウンロード中: %d/24（%d月前のデータ）",
+                            "過去のデータをダウンロード中: %d/%d（%d月前のデータ）",
                             j + 1,
+                            months,
                             j,
                         )
 

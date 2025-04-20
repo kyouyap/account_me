@@ -24,7 +24,17 @@ loggers:
     propagate: false
 
   src.scraper:
-    level: INFO
+    level: DEBUG
+    handlers: [file, console]
+    propagate: false
+    
+  src.scraper.browser:
+    level: DEBUG
+    handlers: [file, console]
+    propagate: false
+
+  src.scraper.gmail_client:
+    level: DEBUG
     handlers: [file, console]
     propagate: false
 

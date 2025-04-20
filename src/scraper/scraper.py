@@ -81,7 +81,7 @@ class MoneyForwardScraper:
             logger.warning("CSVファイル '%s' が空のためスキップします", file_path)
             return None
 
-        encodings = ["utf-8", "shift-jis", "cp932"]
+        encodings = ["shift-jis"]
         errors = []
         decode_errors = []
 
@@ -228,5 +228,9 @@ class MoneyForwardScraper:
             logger.info("スクレイピングが完了しました。")
 
         except Exception as e:
+            logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
-            raise MoneyForwardError(f"スクレイピングに失敗しました: {e}") from e
+            # スタックトレース付きでエラーを再送出
+            raise MoneyForwardError(
+                f"スクレイピングに失敗しました: {e.__class__.__name__}: {str(e)}"
+            ) from e

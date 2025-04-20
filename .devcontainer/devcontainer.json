@@ -14,7 +14,8 @@
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "saoudrizwan.claude-dev",
-                "donjayamanne.python-extension-pack"
+                "donjayamanne.python-extension-pack",
+                "4ops.terraform"
             ]
         }
     },

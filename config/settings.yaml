@@ -12,6 +12,8 @@ moneyforward:
     - institution: "アメリカン・エキスプレスカード"
       action: "divide_amount"
       value: 2
+  history:
+    months_to_download: 3
 
 spreadsheet:
   worksheets:
@@ -60,4 +62,4 @@ paths:
       detail: "/app/outputs/aggregated_files/detail"
       assets: "/app/outputs/aggregated_files/assets"
   downloads: "/app/downloads"
-  credentials: "/app/key/spreadsheet_managementkey.json"
+  credentials: "/app/credentials/spread_sheet_credential.json"

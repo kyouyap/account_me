@@ -31,6 +31,11 @@ class SpecialRule(BaseModel):
     value: float
 
 
+class HistorySettings(BaseModel):
+    """履歴データ取得の設定。"""
+
+    months_to_download: int
+
 class MoneyForwardSettings(BaseModel):
     """MoneyForward関連の設定。"""
 
@@ -38,6 +43,7 @@ class MoneyForwardSettings(BaseModel):
     endpoints: Endpoints
     selenium: SeleniumSettings
     special_rules: List[SpecialRule]
+    history: HistorySettings
 
 
 class SpreadsheetColumn(BaseModel):

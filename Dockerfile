@@ -18,6 +18,7 @@ ENV CHROME_PATH=/usr/bin/chromium
 RUN apt-get update && apt-get install -y \
     wget=1.21-1+deb11u1 \
     gnupg=2.2.27-2+deb11u2 \
+    apt-transport-https ca-certificates \
     xvfb=2:1.20.11-1+deb11u15 \
     libgconf-2-4=3.2.6-7 \
     libnss3=2:3.61-1+deb11u4 \
@@ -27,6 +28,14 @@ RUN apt-get update && apt-get install -y \
     fonts-ipafont-mincho=00303-21 \
     git=1:2.30.2-1+deb11u4 \
     && rm -rf /var/lib/apt/lists/*
+
+# Google Cloud SDKインストール
+RUN apt-get update && apt-get install -y curl && \
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/cloud.google.gpg > /dev/null && \
+    apt-get update && \
+    apt-get install -y google-cloud-sdk && \
+    rm -rf /var/lib/apt/lists/*
 
 # ChromiumとChromeDriverのインストール
 # hadolint ignore=DL3008,DL3009,DL3015,DL4006

@@ -32,3 +32,15 @@ variable "spreadsheet_key" {
   type        = string
   sensitive   = true
 }
+
+variable "gmail_credentials_file" {
+  description = "Gmail API認証情報のJSONファイルへのパス"
+  type        = string
+}
+
+variable "gmail_credentials_json" {
+  description = "Gmail API認証情報のJSON（非推奨：代わりにgmail_credentials_fileを使用してください）"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

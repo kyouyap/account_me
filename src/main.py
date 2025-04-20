@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 def run_scraping() -> None:
     """スクレイピング処理を実行する。"""
     try:
-        # 起動待機（Seleniumコンテナの起動を待つ）
-        logger.info("Seleniumコンテナの起動を待機中...")
-        time.sleep(10)
-
         # スクレイピングの実行
         logger.info("スクレイピングを開始します。")
         scraper = MoneyForwardScraper()

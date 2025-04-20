@@ -3,7 +3,8 @@ locals {
   required_apis = [
     "storage.googleapis.com",
     "bigquery.googleapis.com",
-    "secretmanager.googleapis.com"
+    "secretmanager.googleapis.com",
+    "gmail.googleapis.com",
   ]
 }
 
@@ -87,4 +88,29 @@ resource "google_bigquery_dataset" "moneyforward" {
   dataset_id    = "moneyforward"
   friendly_name = "MoneyForward Dataset"
   location      = var.region
+}
+
+# Gmail API 認証情報
+resource "google_secret_manager_secret" "gmail_credentials" {
+  secret_id = "gmail-api-credentials"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "gmail_credentials" {
+  secret      = google_secret_manager_secret.gmail_credentials.id
+  # 外部ファイルから認証情報を読み込む
+  # 従来のJSON文字列変数が空でない場合はそちらを優先（後方互換性のため）
+  secret_data = var.gmail_credentials_json != "" ? var.gmail_credentials_json : file(var.gmail_credentials_file)
+}
+
+# Gmail API トークン
+resource "google_secret_manager_secret" "gmail_token" {
+  secret_id = "gmail-api-token"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
 }
