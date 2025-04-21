@@ -18,7 +18,8 @@
                 "ms-python.vscode-pylance",
                 "saoudrizwan.claude-dev",
                 "donjayamanne.python-extension-pack",
-                "4ops.terraform"
+                "4ops.terraform",
+                "ms-python.mypy-type-checker"
             ]
         }
     },

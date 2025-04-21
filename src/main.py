@@ -1,7 +1,6 @@
 """MoneyForwardスクレイピングメインモジュール。"""
 
 import logging
-import time
 from config.logging_config import setup_logging
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
@@ -32,7 +31,6 @@ def run_scraping() -> None:
         logger.error("処理中にエラーが発生しました: %s", e)
     except Exception as e:
         logger.error("予期せぬエラーが発生しました: %s", e)
-
 
 
 if __name__ == "__main__":

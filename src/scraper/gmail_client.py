@@ -5,12 +5,10 @@ import datetime
 import logging
 import re
 import socket
-from email.mime.text import MIMEText
-from typing import Optional, Tuple
+from typing import Tuple, TypedDict
 import json
 import os
 
-import google.auth.exceptions
 from config.secrets import update_secret
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -27,12 +25,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
 ]
 
+
+class AuthSettings(TypedDict):
+    """認証設定の型定義。"""
+
+    sender: str
+    subject: str
+    code_pattern: str
+    code_timeout_minutes: int
+
+
 class GmailClient:
     """Gmail APIを使用してメールを操作するクラス。"""
 
+    auth_settings: AuthSettings
+
     def __init__(self) -> None:
         """初期化。"""
-        self.auth_settings = {
+        self.auth_settings: AuthSettings = {
             "sender": "do_not_reply@moneyforward.com",
             "subject": "Money Forward ID Additional Authentication via Email",
             "code_pattern": r"\d{6}",
@@ -51,17 +61,17 @@ class GmailClient:
         """
         try:
             logger.info("Gmail APIサービスの作成を開始")
-            
+
             try:
                 # クライアントシークレットの取得
                 client_secrets_str = os.getenv("GMAIL_CREDENTIALS")
                 if not client_secrets_str:
                     logger.error("GMAIL_CREDENTIALS環境変数が設定されていません")
                     raise GmailApiError("GMAIL_CREDENTIALS環境変数が設定されていません")
-                
+
                 logger.info("クライアント設定のJSONをパース")
                 client_config = json.loads(client_secrets_str)
-                
+
                 # Secret Managerからトークンを取得
                 creds = None
                 token_str = os.getenv("GMAIL_API_TOKEN")
@@ -69,7 +79,9 @@ class GmailClient:
                     try:
                         logger.info("Secret Managerからトークンを取得")
                         token_data = json.loads(token_str)
-                        creds = Credentials.from_authorized_user_info(token_data, scopes=SCOPES)
+                        creds = Credentials.from_authorized_user_info(
+                            token_data, scopes=SCOPES
+                        )
                         logger.info("Secret Managerからの既存トークンでの認証に成功")
                     except Exception as e:
                         logger.warning("Secret Managerからのトークン取得に失敗: %s", e)
@@ -83,10 +95,12 @@ class GmailClient:
                         update_secret("gmail-api-token", creds.to_json())
                     else:
                         logger.info("新規認証フローを開始")
-                        flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
+                        flow = InstalledAppFlow.from_client_config(
+                            client_config, scopes=SCOPES
+                        )
                         creds = flow.run_local_server(port=0)
                         logger.info("新規認証フローが完了")
-                        
+
                         # 新規トークンをSecret Managerに保存
                         logger.info("新規トークンをSecret Managerに保存")
                         update_secret("gmail-api-token", creds.to_json())
@@ -131,11 +145,14 @@ class GmailClient:
                 body = base64.urlsafe_b64decode(
                     message["payload"]["body"]["data"]
                 ).decode()
-            
+
             logger.info("メール本文の取得が完了")
 
             # 認証コードを抽出
-            logger.info("認証コードのパターンマッチを試行: %s", self.auth_settings["code_pattern"])
+            logger.info(
+                "認証コードのパターンマッチを試行: %s",
+                self.auth_settings["code_pattern"],
+            )
             code_match = re.search(self.auth_settings["code_pattern"], body)
             if not code_match:
                 logger.error("認証コードのパターンが本文中に見つかりません")
@@ -154,7 +171,7 @@ class GmailClient:
                 raise VerificationCodeError("有効期限が見つかりません")
             expiry_str = expiry_match.group(1)
             logger.info("有効期限の文字列を抽出: %s", expiry_str)
-            
+
             expiry = datetime.datetime.strptime(
                 expiry_str, "%B %d, %Y %H:%M:%S"
             ).replace(tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
@@ -179,9 +196,9 @@ class GmailClient:
             # 認証メールを検索
             query = (
                 f"from:{self.auth_settings['sender']} "
-                f"subject:\"{self.auth_settings['subject']}\""
+                f'subject:"{self.auth_settings["subject"]}"'
             )
-            
+
             logger.info("メール検索クエリ: %s", query)
 
             logger.info("Gmail APIでメールを検索")
@@ -277,9 +294,9 @@ class GmailClient:
             # 認証メールを検索
             query = (
                 f"from:{self.auth_settings['sender']} "
-                f"subject:\"{self.auth_settings['subject']}\""
+                f'subject:"{self.auth_settings["subject"]}"'
             )
-            
+
             logger.info("メール検索クエリ: %s", query)
 
             logger.info("Gmail APIでメールを検索")

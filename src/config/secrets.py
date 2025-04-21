@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 _project_number: Optional[str] = None
 
+
 def get_project_number() -> str:
     """GCPプロジェクト番号を取得。
 
@@ -34,10 +35,16 @@ def get_project_number() -> str:
             project_id = id_result.stdout.strip()
             if not project_id:
                 raise ConfigurationError("プロジェクトIDが設定されていません")
-            
+
             # プロジェクトIDを使用してプロジェクト番号を取得
             number_result = subprocess.run(
-                ["gcloud", "projects", "describe", project_id, "--format=value(projectNumber)"],
+                [
+                    "gcloud",
+                    "projects",
+                    "describe",
+                    project_id,
+                    "--format=value(projectNumber)",
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -48,6 +55,7 @@ def get_project_number() -> str:
         except subprocess.CalledProcessError as e:
             raise ConfigurationError(f"プロジェクト番号の取得に失敗: {e}")
     return _project_number
+
 
 def get_secrets() -> None:
     """Secret Managerから必要な環境変数を設定。
@@ -75,10 +83,13 @@ def get_secrets() -> None:
                 os.environ[env_var] = response.payload.data.decode("UTF-8")
                 logger.info("シークレット '%s' を環境変数に設定しました", secret_name)
             except Exception as e:
-                raise ConfigurationError(f"シークレット '{secret_name}' の取得に失敗: {e}")
+                raise ConfigurationError(
+                    f"シークレット '{secret_name}' の取得に失敗: {e}"
+                )
 
     except Exception as e:
         raise ConfigurationError(f"シークレットの取得に失敗: {e}")
+
 
 def update_secret(secret_name: str, secret_value: str) -> None:
     """Secret Managerのシークレットを更新。
@@ -109,6 +120,7 @@ def update_secret(secret_name: str, secret_value: str) -> None:
 
     except Exception as e:
         raise ConfigurationError(f"シークレットの更新に失敗: {e}")
+
 
 if __name__ == "__main__":
     get_secrets()

@@ -45,8 +45,10 @@ def mock_env(monkeypatch):
 
 def test_init_calls_get_secrets(monkeypatch):
     called = {"flag": False}
+
     def fake_get_secrets():
         called["flag"] = True
+
     monkeypatch.setattr(secrets_mod, "get_secrets", fake_get_secrets)
     scraper = MoneyForwardScraper()
     assert called["flag"], "get_secrets() が呼ばれていません"
@@ -97,7 +99,9 @@ def test_clean_directories_make_dirs(tmp_path, scraper, monkeypatch):
 
 
 def test_clean_directories_download_error(scraper):
-    scraper.file_downloader.clean_download_dir = lambda: (_ for _ in ()).throw(OSError("fail"))
+    scraper.file_downloader.clean_download_dir = lambda: (_ for _ in ()).throw(
+        OSError("fail")
+    )
     scraper._clean_directories()  # 例外なし
 
 
@@ -107,13 +111,24 @@ def test_clean_directories_file_removal_error(scraper, monkeypatch):
     fake_settings.paths.outputs.aggregated_files.assets = "dummy"
     monkeypatch.setattr(scraper_module, "settings", fake_settings)
     scraper.file_downloader.clean_download_dir = lambda: None
+
     class FakeFile:
-        def unlink(self): raise OSError("unlink fail")
+        def unlink(self):
+            raise OSError("unlink fail")
+
     class FakePath:
-        def __init__(self,*args,**kw): pass
-        def exists(self): return True
-        def glob(self,pattern): return [FakeFile()]
-        def mkdir(self,parents): pass
+        def __init__(self, *args, **kw):
+            pass
+
+        def exists(self):
+            return True
+
+        def glob(self, pattern):
+            return [FakeFile()]
+
+        def mkdir(self, parents):
+            pass
+
     monkeypatch.setattr(scraper_module, "Path", FakePath)
     scraper._clean_directories()
 
@@ -124,20 +139,32 @@ def test_clean_directories_dir_op_error(scraper, monkeypatch):
     fake_settings.paths.outputs.aggregated_files.assets = "x"
     monkeypatch.setattr(scraper_module, "settings", fake_settings)
     scraper.file_downloader.clean_download_dir = lambda: None
+
     class FakePath:
-        def __init__(self,*args,**kw): pass
-        def exists(self): raise OSError("op fail")
-        def glob(self,pattern): return []
-        def mkdir(self,parents): pass
+        def __init__(self, *args, **kw):
+            pass
+
+        def exists(self):
+            raise OSError("op fail")
+
+        def glob(self, pattern):
+            return []
+
+        def mkdir(self, parents):
+            pass
+
     monkeypatch.setattr(scraper_module, "Path", FakePath)
     scraper._clean_directories()
 
 
-@pytest.mark.parametrize("encoding,data", [
-    ("utf-8", "c1,c2\nx,1"),
-    ("shift-jis", "a,b\nあ,2"),
-    ("cp932", "d,e\nい,3"),
-])
+@pytest.mark.parametrize(
+    "encoding,data",
+    [
+        ("utf-8", "c1,c2\nx,1"),
+        ("shift-jis", "a,b\nあ,2"),
+        ("cp932", "d,e\nい,3"),
+    ],
+)
 def test_read_csv_with_encoding_success(scraper, tmp_path, encoding, data):
     fp = tmp_path / "f.csv"
     fp.write_bytes(data.encode(encoding))
@@ -173,11 +200,14 @@ def test_aggregate_csv_files_no_files(scraper, tmp_path):
 
 
 def test_aggregate_csv_files_success(tmp_path, scraper, monkeypatch):
-    dl = tmp_path / "dl"; dl.mkdir()
+    dl = tmp_path / "dl"
+    dl.mkdir()
     (dl / "t.csv").write_text("c,金額（円）,保有金融機関\nx,100,A\n")
     scraper.download_dir = dl
     fake_settings = MagicMock()
-    fake_settings.moneyforward.special_rules = [MagicMock(action="divide_amount", institution="A", value=2)]
+    fake_settings.moneyforward.special_rules = [
+        MagicMock(action="divide_amount", institution="A", value=2)
+    ]
     monkeypatch.setattr(scraper_module, "settings", fake_settings)
     out = tmp_path / "o.csv"
     scraper._aggregate_csv_files(out)
@@ -186,11 +216,14 @@ def test_aggregate_csv_files_success(tmp_path, scraper, monkeypatch):
 
 
 def test_aggregate_csv_files_no_transform(tmp_path, scraper, monkeypatch):
-    dl = tmp_path / "dl"; dl.mkdir()
+    dl = tmp_path / "dl"
+    dl.mkdir()
     (dl / "t.csv").write_text("c1,c2\n1,2\n")
     scraper.download_dir = dl
     fake_settings = MagicMock()
-    fake_settings.moneyforward.special_rules = [MagicMock(action="divide_amount", institution="X", value=10)]
+    fake_settings.moneyforward.special_rules = [
+        MagicMock(action="divide_amount", institution="X", value=10)
+    ]
     monkeypatch.setattr(scraper_module, "settings", fake_settings)
     out = tmp_path / "o2.csv"
     scraper._aggregate_csv_files(out)
@@ -199,16 +232,22 @@ def test_aggregate_csv_files_no_transform(tmp_path, scraper, monkeypatch):
 
 
 def test_aggregate_csv_files_malformed(scraper, tmp_path, monkeypatch):
-    dl = tmp_path / "dl"; dl.mkdir()
+    dl = tmp_path / "dl"
+    dl.mkdir()
     (dl / "t.csv").write_text("bad")
     scraper.download_dir = dl
-    monkeypatch.setattr(scraper, "_read_csv_with_encoding", lambda p: (_ for _ in ()).throw(Exception("fail")))
+    monkeypatch.setattr(
+        scraper,
+        "_read_csv_with_encoding",
+        lambda p: (_ for _ in ()).throw(Exception("fail")),
+    )
     with pytest.raises(MoneyForwardError):
         scraper._aggregate_csv_files(tmp_path / "o.csv")
 
 
 def test_aggregate_csv_files_empty_df(tmp_path, scraper):
-    dl = tmp_path / "dl"; dl.mkdir()
+    dl = tmp_path / "dl"
+    dl.mkdir()
     (dl / "t.csv").write_text("c,金額（円）,保有金融機関\n")
     scraper.download_dir = dl
     scraper._aggregate_csv_files(tmp_path / "o.csv")
@@ -220,7 +259,9 @@ def test_download_and_aggregate(scraper):
     browser.get_links_for_download.return_value = ["l1", "l2"]
     browser.driver = "drv"
     calls = []
-    scraper.file_downloader.download_from_links = lambda drv, links: calls.append(("down", drv, links))
+    scraper.file_downloader.download_from_links = lambda drv, links: calls.append(
+        ("down", drv, links)
+    )
     scraper._aggregate_csv_files = lambda out: calls.append(("agg", out))
     scraper._download_and_aggregate(browser, "endpoint", Path("o"))
     assert calls == [("down", "drv", ["l1", "l2"]), ("agg", Path("o"))]
@@ -239,7 +280,9 @@ def test_scrape_missing_credentials_branch(scraper, monkeypatch):
 def test_scrape_raises_mf_error_from_check_env(scraper, mock_env):
     calls = []
     scraper.file_downloader.clean_download_dir = lambda: calls.append(True)
-    scraper._check_env_variables = lambda: (_ for _ in ()).throw(MoneyForwardError("env missing"))
+    scraper._check_env_variables = lambda: (_ for _ in ()).throw(
+        MoneyForwardError("env missing")
+    )
     with pytest.raises(MoneyForwardError):
         scraper.scrape()
     assert calls == []
@@ -249,15 +292,15 @@ def test_scrape_success_final_cleanup(scraper, mock_env, monkeypatch):
     scraper._check_env_variables = lambda: None
     scraper._clean_directories = lambda: None
     calls = []
-    scraper._download_and_aggregate = lambda b,e,o: calls.append(('agg', e))
-    scraper.file_downloader.clean_download_dir = lambda: calls.append(('clean', None))
+    scraper._download_and_aggregate = lambda b, e, o: calls.append(("agg", e))
+    scraper.file_downloader.clean_download_dir = lambda: calls.append(("clean", None))
     browser = MagicMock()
     browser.__enter__.return_value = browser
-    browser.login = lambda e,p: None
+    browser.login = lambda e, p: None
     monkeypatch.setattr(scraper, "browser_manager", browser)
     scraper.scrape()
-    agg_count = len([c for c in calls if c[0]=='agg'])
-    clean_count = len([c for c in calls if c[0]=='clean'])
+    agg_count = len([c for c in calls if c[0] == "agg"])
+    clean_count = len([c for c in calls if c[0] == "clean"])
     assert agg_count == 2
     assert clean_count == 2
 
@@ -267,9 +310,11 @@ def test_scrape_download_error(scraper, mock_env, monkeypatch):
     scraper._clean_directories = lambda: None
     browser = MagicMock()
     browser.__enter__.return_value = browser
-    browser.login = lambda e,p: None
+    browser.login = lambda e, p: None
     monkeypatch.setattr(scraper, "browser_manager", browser)
-    scraper._download_and_aggregate = lambda b,e,o: (_ for _ in ()).throw(KeyError("bad"))
+    scraper._download_and_aggregate = lambda b, e, o: (_ for _ in ()).throw(
+        KeyError("bad")
+    )
     scraper.file_downloader.clean_download_dir = lambda: None
     with pytest.raises(MoneyForwardError) as exc:
         scraper.scrape()
@@ -295,18 +340,21 @@ def test_scrape_browser_enter_error(scraper, mock_env, monkeypatch):
 
 
 def test_scrape_success_flow(scraper, mock_env, monkeypatch):
-    fake = datetime.datetime(2025,4,21)
+    fake = datetime.datetime(2025, 4, 21)
+
     class FakeDate(datetime.datetime):
         @classmethod
-        def now(cls): return fake
+        def now(cls):
+            return fake
+
     monkeypatch.setattr(scraper_module.datetime, "datetime", FakeDate)
     scraper._check_env_variables = lambda: None
     scraper._clean_directories = lambda: None
     calls = []
-    scraper._download_and_aggregate = lambda b,e,o: calls.append((e,o))
+    scraper._download_and_aggregate = lambda b, e, o: calls.append((e, o))
     browser = MagicMock()
     browser.__enter__.return_value = browser
-    browser.login = lambda e,p: None
+    browser.login = lambda e, p: None
     monkeypatch.setattr(scraper, "browser_manager", browser)
     scraper.scrape()
     assert len(calls) == 2

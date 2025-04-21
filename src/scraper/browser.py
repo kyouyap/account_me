@@ -78,7 +78,7 @@ class BrowserManager:
         """ChromeDriverを設定。"""
         logger.info("ブラウザドライバの設定を開始")
         chrome_options = Options()
-        
+
         # ChromeDriverのパス設定
         chrome_driver_path = os.getenv(
             "CHROME_DRIVER_PATH", settings.paths.chrome_driver
@@ -133,11 +133,11 @@ class BrowserManager:
         try:
             logger.info("ChromeDriverサービスを初期化")
             service = Service(executable_path=chrome_driver_path)
-            
+
             logger.info("WebDriverを初期化")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             logger.info("WebDriverの初期化が完了")
-            
+
         except WebDriverException as e:
             logger.error("WebDriverの初期化に失敗: %s", e, exc_info=True)
             raise ScrapingError(f"WebDriverの初期化に失敗しました: {e}") from e
@@ -234,29 +234,27 @@ class BrowserManager:
             VerificationCodeError: 待機タイムアウト時
         """
         max_attempts = 10  # 最大待機回数
-        wait_seconds = 3   # 待機間隔（秒）
-        
+        wait_seconds = 3  # 待機間隔（秒）
+
         for attempt in range(max_attempts):
             try:
                 # 新しいメールを検索
                 email_id = gmail_client.get_latest_verification_email_id()
-                
+
                 # 新しいメールが来ているか確認
                 if last_email_id is None or email_id != last_email_id:
                     logger.info("新しい認証メールを検出: %s", email_id)
                     return email_id
-                    
+
                 logger.info(
-                    "メールの到着を待機中... 試行回数: %d/%d",
-                    attempt + 1,
-                    max_attempts
+                    "メールの到着を待機中... 試行回数: %d/%d", attempt + 1, max_attempts
                 )
                 time.sleep(wait_seconds)
-                
+
             except Exception as e:
                 logger.warning("メール検索中にエラー: %s", e)
                 time.sleep(wait_seconds)
-                
+
         raise VerificationCodeError("新しい認証メールの到着待機がタイムアウトしました")
 
     def login(self, email: str, password: str) -> None:
@@ -299,36 +297,46 @@ class BrowserManager:
             try:
                 logger.info("2段階認証フォームの有無を確認")
                 try:
-                    code_input = self.wait_and_find_element(By.NAME, "email_otp", timeout=3)  # type: ignore
+                    code_input = self.wait_and_find_element(
+                        By.NAME, "email_otp", timeout=3
+                    )  # type: ignore
                     logger.info("2段階認証が要求されました")
                 except ScrapingError:
                     try:
                         # 古い形式の2段階認証フォームを試行
-                        code_input = self.wait_and_find_element(By.NAME, "mfid_user[otp_attempt]", timeout=3)  # type: ignore
+                        code_input = self.wait_and_find_element(
+                            By.NAME, "mfid_user[otp_attempt]", timeout=3
+                        )  # type: ignore
                         logger.info("古い形式の2段階認証フォームが見つかりました")
                     except ScrapingError as e:
                         logger.error("2段階認証フォームが見つかりません: %s", e)
                         if self.driver:
-                            logger.debug("現在のページソース: %s", self.driver.page_source)
+                            logger.debug(
+                                "現在のページソース: %s", self.driver.page_source
+                            )
                         raise
-                
+
                 # Gmail APIクライアントを初期化
                 logger.info("Gmail APIクライアントを初期化")
                 gmail_client = GmailClient()
-                
+
                 # 現在の最新メールIDを取得
                 logger.info("現在の最新メールIDを取得")
                 last_email_id = gmail_client.get_latest_verification_email_id()
-                
+
                 # 送信後の新しいメールを待機
                 logger.info("新しい認証メールの到着を待機")
-                new_email_id = self.wait_for_new_verification_email(gmail_client, last_email_id)
-                
+                new_email_id = self.wait_for_new_verification_email(
+                    gmail_client, last_email_id
+                )
+
                 # 新しいメールから認証コードを取得
                 logger.info("新しいメールから認証コードを取得")
-                verification_code = gmail_client.get_verification_code_by_id(new_email_id)
+                verification_code = gmail_client.get_verification_code_by_id(
+                    new_email_id
+                )
                 logger.info("認証コードを取得しました: %s", verification_code)
-                
+
                 # 認証コードを入力して送信
                 logger.info("認証コードを入力: %s", verification_code)
                 code_input.send_keys(verification_code)
@@ -356,7 +364,9 @@ class BrowserManager:
                 with open("error_page.html", "w", encoding="utf-8") as f:
                     f.write(self.driver.page_source)
                 logger.info("エラー時のページソースを保存しました: error_page.html")
-            raise AuthenticationError("ログインフォームの要素が見つかりませんでした。") from e
+            raise AuthenticationError(
+                "ログインフォームの要素が見つかりませんでした。"
+            ) from e
         except ScrapingError as e:
             logger.error("スクレイピング中にエラーが発生: %s", e)
             # デバッグのためにエラー時のページソースも保存
@@ -375,7 +385,9 @@ class BrowserManager:
                 with open("error_page.html", "w", encoding="utf-8") as f:
                     f.write(self.driver.page_source)
                 logger.info("エラー時のページソースを保存しました: error_page.html")
-            raise AuthenticationError(f"ログイン処理中に予期せぬエラーが発生: {e}") from e
+            raise AuthenticationError(
+                f"ログイン処理中に予期せぬエラーが発生: {e}"
+            ) from e
 
     def get_links_for_download(self, page_url: str) -> List[str]:
         """指定されたページからダウンロードリンクを抽出。

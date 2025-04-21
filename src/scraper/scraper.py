@@ -24,9 +24,10 @@ class MoneyForwardScraper:
         self.download_dir = Path(settings.paths.downloads)
         self.browser_manager = BrowserManager()
         self.file_downloader = FileDownloader(self.download_dir)
-        
+
         # シークレットを環境変数に設定
         from config.secrets import get_secrets
+
         get_secrets()
 
     def _check_env_variables(self) -> None:
@@ -164,8 +165,13 @@ class MoneyForwardScraper:
                                     )
                         all_dfs.append(df)
                 except Exception as e:
-                    logger.error(f"ファイル '{file_path}' の処理中にエラーが発生しました:", exc_info=True)
-                    raise MoneyForwardError(f"CSVファイルの処理に失敗しました: {str(e)}") from e
+                    logger.error(
+                        f"ファイル '{file_path}' の処理中にエラーが発生しました:",
+                        exc_info=True,
+                    )
+                    raise MoneyForwardError(
+                        f"CSVファイルの処理に失敗しました: {str(e)}"
+                    ) from e
 
             if all_dfs:
                 # データを結合して重複を削除
@@ -223,24 +229,40 @@ class MoneyForwardScraper:
             password = os.getenv("PASSWORD")
 
             if not email or not password:
-                raise MoneyForwardError("EMAIL/PASSWORDが環境変数に設定されていません。")
+                raise MoneyForwardError(
+                    "EMAIL/PASSWORDが環境変数に設定されていません。"
+                )
 
             base_url = settings.moneyforward.base_url
-            
+
             with self.browser_manager as browser:
                 try:
                     browser.login(email, password)
 
                     # アカウントページ処理
-                    detail_endpoint = f"{base_url}{settings.moneyforward.endpoints.accounts}"
-                    detail_output = Path(settings.paths.outputs.aggregated_files.detail) / f"detail_{current_date}.csv"
-                    self._download_and_aggregate(browser, detail_endpoint, detail_output)
+                    detail_endpoint = (
+                        f"{base_url}{settings.moneyforward.endpoints.accounts}"
+                    )
+                    detail_output = (
+                        Path(settings.paths.outputs.aggregated_files.detail)
+                        / f"detail_{current_date}.csv"
+                    )
+                    self._download_and_aggregate(
+                        browser, detail_endpoint, detail_output
+                    )
 
                     # 履歴ページ処理
                     self.file_downloader.clean_download_dir()
-                    history_endpoint = f"{base_url}{settings.moneyforward.endpoints.history}"
-                    assets_output = Path(settings.paths.outputs.aggregated_files.assets) / f"assets_{current_date}.csv"
-                    self._download_and_aggregate(browser, history_endpoint, assets_output)
+                    history_endpoint = (
+                        f"{base_url}{settings.moneyforward.endpoints.history}"
+                    )
+                    assets_output = (
+                        Path(settings.paths.outputs.aggregated_files.assets)
+                        / f"assets_{current_date}.csv"
+                    )
+                    self._download_and_aggregate(
+                        browser, history_endpoint, assets_output
+                    )
                 except Exception as e:
                     logger.error("ブラウザ操作中にエラーが発生しました:", exc_info=True)
                     error_message = f"スクレイピングに失敗しました。詳細:\n{e.__class__.__name__}: {str(e)}"
@@ -254,5 +276,7 @@ class MoneyForwardScraper:
         except Exception as e:
             logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
-            error_message = f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+            error_message = (
+                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+            )
             raise MoneyForwardError(error_message) from e

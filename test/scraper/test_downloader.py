@@ -216,7 +216,9 @@ def test_download_file_os_error(downloader):
         ),
     ],
 )
-def test_download_from_links_success(downloader, mock_settings, links, months, expected_paths):
+def test_download_from_links_success(
+    downloader, mock_settings, links, months, expected_paths
+):
     """複数リンクからのダウンロード成功テスト。指定された月数分のダウンロードが行われることを確認。"""
     mock_driver = MagicMock()
     mock_element = MagicMock()
@@ -234,9 +236,7 @@ def test_download_from_links_success(downloader, mock_settings, links, months, e
     ):
         # アカウントページのダウンロード処理をモック
         if "account" in links[0]:
-            mock_download.side_effect = [
-                path for path in expected_paths
-            ]
+            mock_download.side_effect = [path for path in expected_paths]
         else:
             mock_download.return_value = expected_paths[0]
 
@@ -244,6 +244,7 @@ def test_download_from_links_success(downloader, mock_settings, links, months, e
         assert len(downloaded_files) == len(expected_paths)
         assert all(path.exists() for path in downloaded_files)
         assert downloaded_files == expected_paths
+
 
 def test_download_from_links_custom_months(downloader, mock_settings):
     """カスタム月数でのダウンロードテスト。"""
@@ -304,6 +305,7 @@ def test_download_from_links_partial_success(downloader, mock_settings):
         assert len(downloaded_files) == 1
         assert downloaded_files[0] == success_path
 
+
 def test_account_page_initial_failure(downloader, mock_settings):
     """アカウントページへのアクセス直後に例外が発生するケース。"""
     mock_driver = MagicMock()
@@ -319,8 +321,9 @@ def test_account_page_initial_failure(downloader, mock_settings):
         pytest.raises(DownloadError) as exc_info,
     ):
         downloader.download_from_links(mock_driver, links)
-    
+
     assert "アカウントページの処理に失敗" in str(exc_info.value)
+
 
 def test_account_page_all_months_failure(downloader, mock_settings, caplog):
     """全ての月のダウンロードが失敗するケース。"""
@@ -344,6 +347,7 @@ def test_account_page_all_months_failure(downloader, mock_settings, caplog):
     assert "アカウントページの処理に失敗: ボタンが見つかりません" in str(exc_info.value)
     assert "アカウントページの処理でエラーが発生" in caplog.text
 
+
 def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
     """一部の月のダウンロードのみ失敗するケース。"""
     mock_driver = MagicMock()
@@ -362,7 +366,7 @@ def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
             success_path2 = downloader.download_dir / "test_2.csv"
             success_path1.touch()
             success_path2.touch()
-            
+
             mock_download.side_effect = [
                 success_path1,
                 DownloadError("2ヶ月目のダウンロード失敗"),
@@ -370,10 +374,14 @@ def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
             ]
 
             downloaded_files = downloader.download_from_links(mock_driver, links)
-            
+
             assert len(downloaded_files) == 2
             assert downloaded_files == [success_path1, success_path2]
-            assert "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗" in caplog.text
+            assert (
+                "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗"
+                in caplog.text
+            )
+
 
 def test_account_page_selenium_errors(downloader, mock_settings, caplog):
     """Seleniumの操作で発生する可能性のあるエラーケースのテスト。"""
@@ -387,7 +395,7 @@ def test_account_page_selenium_errors(downloader, mock_settings, caplog):
 
     # 「今日」ボタンが見つからないケース
     mock_driver.find_element.side_effect = Exception("要素が見つかりません")
-    
+
     with (
         patch("scraper.downloader.settings", mock_settings),
         pytest.raises(DownloadError) as exc_info,
@@ -397,7 +405,10 @@ def test_account_page_selenium_errors(downloader, mock_settings, caplog):
     assert "アカウントページの処理に失敗: 要素が見つかりません" in str(exc_info.value)
     assert "アカウントページの処理でエラーが発生" in caplog.text
 
-def test_download_from_links_continue_on_partial_failure(downloader, mock_settings, caplog):
+
+def test_download_from_links_continue_on_partial_failure(
+    downloader, mock_settings, caplog
+):
     """2 件目のダウンロードで例外が発生しても、
     最初の成功ファイルのみを返却することを検証する。
 
@@ -418,10 +429,16 @@ def test_download_from_links_continue_on_partial_failure(downloader, mock_settin
 
     # 1 回目の成功用パスを用意
     success_path = downloader.download_dir / "download_0.csv"
-    success_path.write_text("dummy")  # ファイル自体はテストで存在を確認しないが、Path として返す
+    success_path.write_text(
+        "dummy"
+    )  # ファイル自体はテストで存在を確認しないが、Path として返す
 
     # download_file のモック：最初は成功パス、次は例外を投げる
-    with patch.object(downloader, "download_file", side_effect=[success_path, DownloadError("2 件目失敗")]):
+    with patch.object(
+        downloader,
+        "download_file",
+        side_effect=[success_path, DownloadError("2 件目失敗")],
+    ):
         # 設定オブジェクトもパッチ
         with patch("scraper.downloader.settings", mock_settings):
             result = downloader.download_from_links(mock_driver, links)

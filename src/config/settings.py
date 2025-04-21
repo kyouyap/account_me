@@ -36,6 +36,7 @@ class HistorySettings(BaseModel):
 
     months_to_download: int
 
+
 class MoneyForwardSettings(BaseModel):
     """MoneyForward関連の設定。"""
 
