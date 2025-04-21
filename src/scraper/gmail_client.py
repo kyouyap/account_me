@@ -4,6 +4,7 @@ import base64
 import datetime
 import logging
 import re
+import socket
 from email.mime.text import MIMEText
 from typing import Optional, Tuple
 import json
@@ -62,16 +63,16 @@ class GmailClient:
                 client_config = json.loads(client_secrets_str)
                 
                 # Secret Managerからトークンを取得
-                try:
-                    logger.info("Secret Managerからトークンを取得")
-                    token_str = os.getenv("GMAIL_API_TOKEN")
-                    if token_str:
+                creds = None
+                token_str = os.getenv("GMAIL_API_TOKEN")
+                if token_str:
+                    try:
+                        logger.info("Secret Managerからトークンを取得")
                         token_data = json.loads(token_str)
                         creds = Credentials.from_authorized_user_info(token_data, scopes=SCOPES)
                         logger.info("Secret Managerからの既存トークンでの認証に成功")
-                except Exception as e:
-                    logger.warning("Secret Managerからのトークン取得に失敗: %s", e)
-                    creds = None
+                    except Exception as e:
+                        logger.warning("Secret Managerからのトークン取得に失敗: %s", e)
 
                 if not creds or not creds.valid:
                     if creds and creds.expired and creds.refresh_token:
@@ -192,6 +193,10 @@ class GmailClient:
             )
             logger.info("メール検索が完了")
 
+            if result is None:
+                logger.error("メール検索結果がNoneでした")
+                raise VerificationCodeError("認証メールが見つかりません")
+
             messages = result.get("messages", [])
             logger.info("検索結果のメール数: %d", len(messages))
             if not messages:
@@ -200,12 +205,14 @@ class GmailClient:
 
             return messages[0]["id"]
 
-        except HttpError as e:
+        except (HttpError, socket.timeout) as e:
             logger.error("Gmail APIのリクエストに失敗: %s", e)
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
+        except VerificationCodeError:
+            raise
         except Exception as e:
             logger.error("認証メールの取得に失敗: %s", e)
-            raise VerificationCodeError(f"認証メールの取得に失敗: {e}") from e
+            raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
 
     def get_verification_code_by_id(self, msg_id: str) -> str:
         """指定されたIDのメールから認証コードを取得。
@@ -230,6 +237,10 @@ class GmailClient:
             )
             logger.info("メールの取得に成功しました")
 
+            if message is None:
+                logger.error("メール本文の取得結果がNoneでした")
+                raise VerificationCodeError("メッセージの解析に失敗")
+
             # コードと有効期限を抽出
             logger.info("メールの内容を解析します")
             code, expiry = self._parse_message(message)
@@ -244,12 +255,14 @@ class GmailClient:
             logger.info("認証コードの取得に成功しました")
             return code
 
-        except HttpError as e:
+        except (HttpError, socket.timeout) as e:
             logger.error("Gmail APIのリクエストに失敗: %s", e)
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
+        except VerificationCodeError:
+            raise
         except Exception as e:
             logger.error("認証コードの取得に失敗: %s", e)
-            raise VerificationCodeError(f"認証コードの取得に失敗: {e}") from e
+            raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
 
     def get_verification_code(self) -> str:
         """最新の認証コードを取得。
@@ -278,6 +291,10 @@ class GmailClient:
             )
             logger.info("メール検索が完了")
 
+            if result is None:
+                logger.error("メール検索結果がNoneでした")
+                raise VerificationCodeError("認証メールが見つかりません")
+
             messages = result.get("messages", [])
             logger.info("検索結果のメール数: %d", len(messages))
             if not messages:
@@ -295,6 +312,10 @@ class GmailClient:
             )
             logger.info("メールの取得に成功しました")
 
+            if message is None:
+                logger.error("メール本文の取得結果がNoneでした")
+                raise VerificationCodeError("メッセージの解析に失敗")
+
             # コードと有効期限を抽出
             logger.info("メールの内容を解析します")
             code, expiry = self._parse_message(message)
@@ -309,9 +330,11 @@ class GmailClient:
             logger.info("認証コードの取得に成功しました")
             return code
 
-        except HttpError as e:
+        except (HttpError, socket.timeout) as e:
             logger.error("Gmail APIのリクエストに失敗: %s", e)
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
+        except VerificationCodeError:
+            raise
         except Exception as e:
             logger.error("認証コードの取得に失敗: %s", e)
-            raise VerificationCodeError(f"認証コードの取得に失敗: {e}") from e
+            raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e

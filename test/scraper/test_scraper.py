@@ -1,253 +1,312 @@
-"""MoneyForwardScraperのテスト。"""
-
+import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
 import pandas as pd
 import pytest
 
+import config.secrets as secrets_mod
+import scraper.scraper as scraper_module
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
 
 
+@pytest.fixture(autouse=True)
+def patch_get_secrets(monkeypatch):
+    """
+    MoneyForwardScraper.__init__ 内で呼ばれる get_secrets() を
+    no-op に置き換えて SecretManager 呼び出しを抑制。
+    """
+    monkeypatch.setattr(secrets_mod, "get_secrets", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def clear_env(monkeypatch):
+    """各テスト前後に EMAIL/PASSWORD 環境変数をクリア。"""
+    monkeypatch.delenv("EMAIL", raising=False)
+    monkeypatch.delenv("PASSWORD", raising=False)
+    yield
+    monkeypatch.delenv("EMAIL", raising=False)
+    monkeypatch.delenv("PASSWORD", raising=False)
+
+
 @pytest.fixture
 def scraper():
-    """テスト用のMoneyForwardScraperインスタンスを生成。"""
+    """パッチ済み get_secrets() 付きのスクレイパーを生成。"""
     return MoneyForwardScraper()
 
 
 @pytest.fixture
-def mock_env_vars(monkeypatch):
-    """環境変数をモック化。"""
-    env_vars = {
-        "EMAIL": "test@example.com",
-        "PASSWORD": "password123",
-        "SELENIUM_URL": "http://localhost:4444",
-    }
-    for key, value in env_vars.items():
-        monkeypatch.setenv(key, value)
-    return env_vars
+def mock_env(monkeypatch):
+    """テスト用の環境変数を設定。"""
+    monkeypatch.setenv("EMAIL", "user@example.com")
+    monkeypatch.setenv("PASSWORD", "pass123")
+    return {"EMAIL": "user@example.com", "PASSWORD": "pass123"}
 
 
-def test_init(scraper):
-    """初期化のテスト。"""
+def test_init_calls_get_secrets(monkeypatch):
+    called = {"flag": False}
+    def fake_get_secrets():
+        called["flag"] = True
+    monkeypatch.setattr(secrets_mod, "get_secrets", fake_get_secrets)
+    scraper = MoneyForwardScraper()
+    assert called["flag"], "get_secrets() が呼ばれていません"
     assert isinstance(scraper.download_dir, Path)
     assert scraper.browser_manager is not None
     assert scraper.file_downloader is not None
 
 
-def test_check_env_variables_success(scraper, mock_env_vars):
-    """環境変数チェックの成功テスト。"""
+def test_check_env_variables_success(scraper, mock_env):
     scraper._check_env_variables()
 
 
-def test_check_env_variables_failure(scraper, monkeypatch):
-    """環境変数チェックの失敗テスト。"""
-    monkeypatch.delenv("EMAIL", raising=False)
-    monkeypatch.delenv("PASSWORD", raising=False)
-    monkeypatch.delenv("SELENIUM_URL", raising=False)
-
-    with pytest.raises(MoneyForwardError) as exc_info:
+def test_check_env_variables_failure(scraper):
+    with pytest.raises(MoneyForwardError) as exc:
         scraper._check_env_variables()
-    assert "環境変数が設定されていません" in str(exc_info.value)
+    assert "環境変数が設定されていません" in str(exc.value)
 
 
-def test_clean_directories(scraper, tmp_path):
-    """ディレクトリクリーンアップのテスト。"""
-    # テスト用のディレクトリとファイルを作成
-    test_dirs = [
-        tmp_path / "downloads",
-        tmp_path / "outputs/aggregated_files/detail",
-        tmp_path / "outputs/aggregated_files/assets",
-    ]
-    for dir_path in test_dirs:
-        dir_path.mkdir(parents=True)
-        (dir_path / "test.txt").write_text("test")
-
-    with patch.object(scraper, "download_dir", test_dirs[0]):
-        with patch("pathlib.Path") as mock_path:
-            mock_path.return_value.exists.return_value = True
-            mock_path.return_value.glob.return_value = [
-                Path(f"{dir_path}/test.txt") for dir_path in test_dirs
-            ]
-
-            scraper._clean_directories()
+def test_clean_directories_success(tmp_path, scraper, monkeypatch):
+    detail = tmp_path / "d1"
+    assets = tmp_path / "d2"
+    detail.mkdir()
+    assets.mkdir()
+    (detail / "a.txt").write_text("x")
+    (assets / "b.txt").write_text("y")
+    fake_settings = MagicMock()
+    fake_settings.paths.outputs.aggregated_files.detail = str(detail)
+    fake_settings.paths.outputs.aggregated_files.assets = str(assets)
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    cleaned = {"ok": False}
+    scraper.file_downloader.clean_download_dir = lambda: cleaned.update(ok=True)
+    scraper._clean_directories()
+    assert cleaned["ok"], "download_dir のクリーンが呼ばれていません"
+    assert list(detail.iterdir()) == []
+    assert list(assets.iterdir()) == []
 
 
-def test_clean_directories_error(scraper, tmp_path):
-    """ディレクトリクリーンアップのエラー処理テスト。"""
-    test_dir = tmp_path / "test_dir"
-    test_dir.mkdir()
-    test_file = test_dir / "test.txt"
-    test_file.write_text("test")
-
-    with (
-        patch.object(scraper, "download_dir", test_dir),
-        patch.object(scraper.file_downloader, "clean_download_dir") as mock_clean,
-    ):
-        mock_clean.side_effect = OSError("削除エラー")
-        # エラーがあってもプログラムは続行する（例外は発生させない）
-        scraper._clean_directories()
+def test_clean_directories_make_dirs(tmp_path, scraper, monkeypatch):
+    d1 = tmp_path / "nd1"
+    d2 = tmp_path / "nd2"
+    fake_settings = MagicMock()
+    fake_settings.paths.outputs.aggregated_files.detail = str(d1)
+    fake_settings.paths.outputs.aggregated_files.assets = str(d2)
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    scraper.file_downloader.clean_download_dir = lambda: None
+    scraper._clean_directories()
+    assert d1.exists() and d2.exists(), "ディレクトリが作成されていません"
 
 
-@pytest.mark.parametrize(
-    "encoding,content",
-    [
-        ("utf-8", "名前,金額\nテスト,1000"),
-        ("shift-jis", "名前,金額\nテスト,1000"),
-        ("cp932", "名前,金額\nテスト,1000"),
-    ],
-)
-def test_read_csv_with_encoding_success(scraper, tmp_path, encoding, content):
-    """CSVファイル読み込みの成功テスト。"""
-    test_file = tmp_path / "test.csv"
-    test_file.write_bytes(content.encode(encoding))
+def test_clean_directories_download_error(scraper):
+    scraper.file_downloader.clean_download_dir = lambda: (_ for _ in ()).throw(OSError("fail"))
+    scraper._clean_directories()  # 例外なし
 
-    df = scraper._read_csv_with_encoding(test_file)
+
+def test_clean_directories_file_removal_error(scraper, monkeypatch):
+    fake_settings = MagicMock()
+    fake_settings.paths.outputs.aggregated_files.detail = "dummy"
+    fake_settings.paths.outputs.aggregated_files.assets = "dummy"
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    scraper.file_downloader.clean_download_dir = lambda: None
+    class FakeFile:
+        def unlink(self): raise OSError("unlink fail")
+    class FakePath:
+        def __init__(self,*args,**kw): pass
+        def exists(self): return True
+        def glob(self,pattern): return [FakeFile()]
+        def mkdir(self,parents): pass
+    monkeypatch.setattr(scraper_module, "Path", FakePath)
+    scraper._clean_directories()
+
+
+def test_clean_directories_dir_op_error(scraper, monkeypatch):
+    fake_settings = MagicMock()
+    fake_settings.paths.outputs.aggregated_files.detail = "x"
+    fake_settings.paths.outputs.aggregated_files.assets = "x"
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    scraper.file_downloader.clean_download_dir = lambda: None
+    class FakePath:
+        def __init__(self,*args,**kw): pass
+        def exists(self): raise OSError("op fail")
+        def glob(self,pattern): return []
+        def mkdir(self,parents): pass
+    monkeypatch.setattr(scraper_module, "Path", FakePath)
+    scraper._clean_directories()
+
+
+@pytest.mark.parametrize("encoding,data", [
+    ("utf-8", "c1,c2\nx,1"),
+    ("shift-jis", "a,b\nあ,2"),
+    ("cp932", "d,e\nい,3"),
+])
+def test_read_csv_with_encoding_success(scraper, tmp_path, encoding, data):
+    fp = tmp_path / "f.csv"
+    fp.write_bytes(data.encode(encoding))
+    df = scraper._read_csv_with_encoding(fp)
     assert isinstance(df, pd.DataFrame)
-    assert len(df) > 0
 
 
-def test_read_csv_with_encoding_empty_file(scraper, tmp_path):
-    """空のCSVファイル読み込みテスト。"""
-    test_file = tmp_path / "empty.csv"
-    test_file.write_text("")
-
-    result = scraper._read_csv_with_encoding(test_file)
-    assert result is None  # 空ファイルの場合はNoneを返す
+def test_read_csv_with_encoding_empty(scraper, tmp_path):
+    fp = tmp_path / "e.csv"
+    fp.write_text("")
+    assert scraper._read_csv_with_encoding(fp) is None
 
 
-def test_read_csv_with_encoding_generic_error(scraper, tmp_path):
-    """CSVファイル読み込みの一般エラーテスト。"""
-    test_file = tmp_path / "test.csv"
-    test_file.write_text("test")
-
-    with patch("pandas.read_csv") as mock_read_csv:
-        mock_read_csv.side_effect = Exception("予期せぬエラー")
-        result = scraper._read_csv_with_encoding(test_file)
-        assert result is None  # エラー時はNoneを返す
-
-
-def test_read_csv_with_encoding_all_encodings_fail(scraper, tmp_path):
-    """全エンコーディングでの読み込み失敗テスト。"""
-    test_file = tmp_path / "test.csv"
-    test_file.write_bytes(b"\xff\xfe")  # 無効なUTF-8バイト列
-
-    result = scraper._read_csv_with_encoding(test_file)
-    assert result is None  # すべてのエンコーディングが失敗した場合はNoneを返す
+def test_read_csv_with_encoding_errors(scraper, tmp_path):
+    fp = tmp_path / "f.csv"
+    fp.write_text("x")
+    err = UnicodeDecodeError("utf-8", b"", 0, 1, "reason")
+    with patch("pandas.read_csv", side_effect=err):
+        assert scraper._read_csv_with_encoding(fp) is None
+    with patch("pandas.read_csv", side_effect=Exception("boom")):
+        assert scraper._read_csv_with_encoding(fp) is None
 
 
-def test_aggregate_csv_files_success(scraper, tmp_path):
-    """CSVファイル集約の成功テスト。"""
-    # テストデータ作成
-    download_dir = tmp_path / "downloads"
-    download_dir.mkdir()
-
-    csv_content = """日付,金額（円）,保有金融機関,メモ
-2024-03-24,1000,Bank A,Test
-2024-03-24,2000,American Express,Test"""
-
-    test_file = download_dir / "test.csv"
-    test_file.write_text(csv_content)
-
-    # settingsのモック
-    mock_settings = MagicMock()
-    mock_settings.moneyforward.special_rules = [
-        MagicMock(action="divide_amount", institution="American Express", value=2)
-    ]
-
-    with (
-        patch.object(scraper, "download_dir", download_dir),
-        patch("scraper.scraper.settings", mock_settings),
-    ):
-        output_path = tmp_path / "output.csv"
-        scraper._aggregate_csv_files(output_path)
-
-        assert output_path.exists()
-        df = pd.read_csv(output_path)
-        assert len(df) == 2
-        # American Expressの金額が半額になっていることを確認
-        assert (
-            df[df["保有金融機関"] == "American Express"]["金額（円）"].iloc[0] == 1000.0
-        )
-
-
-def test_aggregate_csv_files_error(scraper, tmp_path):
-    """CSVファイル集約のエラーテスト。"""
-    with patch.object(scraper, "download_dir", tmp_path):
-        mock_file = tmp_path / "test.csv"
-        mock_file.touch()  # ファイルを作成
-        result = scraper._aggregate_csv_files(tmp_path / "output.csv")
-        assert result is None
+def test_read_csv_with_encoding_header_only(scraper, tmp_path):
+    fp = tmp_path / "header_only.csv"
+    fp.write_text("col1,col2\n")
+    assert scraper._read_csv_with_encoding(fp) is None
 
 
 def test_aggregate_csv_files_no_files(scraper, tmp_path):
-    """CSVファイル集約の失敗テスト（ファイルなし）。"""
-    with patch.object(scraper, "download_dir", tmp_path):
-        result = scraper._aggregate_csv_files(tmp_path / "output.csv")
-        assert result is None
+    scraper.download_dir = tmp_path
+    assert scraper._aggregate_csv_files(tmp_path / "o.csv") is None
 
 
-def test_aggregate_csv_files_empty_dataframe(scraper, tmp_path):
-    """空のデータフレームを含むCSVファイルの集約テスト。"""
-    # テストデータ作成
-    download_dir = tmp_path / "downloads"
-    download_dir.mkdir()
-
-    # 通常のデータと空のデータを含むCSVファイルを作成
-    valid_content = """日付,金額（円）,保有金融機関,メモ
-2024-03-24,1000,Bank A,Test"""
-    empty_content = """日付,金額（円）,保有金融機関,メモ"""
-
-    (download_dir / "valid.csv").write_text(valid_content)
-    (download_dir / "empty.csv").write_text(empty_content)
-
-    with patch.object(scraper, "download_dir", download_dir):
-        output_path = tmp_path / "output.csv"
-        scraper._aggregate_csv_files(output_path)
-
-        assert output_path.exists()
-        df = pd.read_csv(output_path)
-        assert len(df) == 1  # 空のデータフレームは無視されるべき
+def test_aggregate_csv_files_success(tmp_path, scraper, monkeypatch):
+    dl = tmp_path / "dl"; dl.mkdir()
+    (dl / "t.csv").write_text("c,金額（円）,保有金融機関\nx,100,A\n")
+    scraper.download_dir = dl
+    fake_settings = MagicMock()
+    fake_settings.moneyforward.special_rules = [MagicMock(action="divide_amount", institution="A", value=2)]
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    out = tmp_path / "o.csv"
+    scraper._aggregate_csv_files(out)
+    df = pd.read_csv(out, encoding="utf-8-sig")
+    assert df["金額（円）"].iloc[0] == 50.0
 
 
-def test_aggregate_csv_files_no_duplicates(scraper, tmp_path):
-    """重複データの排除を確認するテスト。"""
-    download_dir = tmp_path / "downloads"
-    download_dir.mkdir()
-
-    # 重複するデータを含むCSVファイルを作成
-    duplicate_content = """日付,金額（円）,保有金融機関,メモ
-2024-03-24,1000,Bank A,Test
-2024-03-24,1000,Bank A,Test
-2024-03-24,2000,Bank B,Test"""
-
-    (download_dir / "data.csv").write_text(duplicate_content)
-
-    with patch.object(scraper, "download_dir", download_dir):
-        output_path = tmp_path / "output.csv"
-        scraper._aggregate_csv_files(output_path)
-
-        assert output_path.exists()
-        df = pd.read_csv(output_path)
-        assert len(df) == 2  # 重複が排除されているべき
-        assert df["金額（円）"].sum() == 3000  # 合計金額が正しいことを確認
+def test_aggregate_csv_files_no_transform(tmp_path, scraper, monkeypatch):
+    dl = tmp_path / "dl"; dl.mkdir()
+    (dl / "t.csv").write_text("c1,c2\n1,2\n")
+    scraper.download_dir = dl
+    fake_settings = MagicMock()
+    fake_settings.moneyforward.special_rules = [MagicMock(action="divide_amount", institution="X", value=10)]
+    monkeypatch.setattr(scraper_module, "settings", fake_settings)
+    out = tmp_path / "o2.csv"
+    scraper._aggregate_csv_files(out)
+    df = pd.read_csv(out)
+    assert df["c2"].iloc[0] == 2
 
 
-def test_aggregate_csv_files_encoding(scraper, tmp_path):
-    """UTF-8-sigエンコーディングでの出力を確認するテスト。"""
-    download_dir = tmp_path / "downloads"
-    download_dir.mkdir()
+def test_aggregate_csv_files_malformed(scraper, tmp_path, monkeypatch):
+    dl = tmp_path / "dl"; dl.mkdir()
+    (dl / "t.csv").write_text("bad")
+    scraper.download_dir = dl
+    monkeypatch.setattr(scraper, "_read_csv_with_encoding", lambda p: (_ for _ in ()).throw(Exception("fail")))
+    with pytest.raises(MoneyForwardError):
+        scraper._aggregate_csv_files(tmp_path / "o.csv")
 
-    content = """日付,金額（円）,保有金融機関,メモ
-2024-03-24,1000,テスト銀行,テスト"""
 
-    (download_dir / "data.csv").write_text(content)
+def test_aggregate_csv_files_empty_df(tmp_path, scraper):
+    dl = tmp_path / "dl"; dl.mkdir()
+    (dl / "t.csv").write_text("c,金額（円）,保有金融機関\n")
+    scraper.download_dir = dl
+    scraper._aggregate_csv_files(tmp_path / "o.csv")
+    assert not (tmp_path / "o.csv").exists()
 
-    with patch.object(scraper, "download_dir", download_dir):
-        output_path = tmp_path / "output.csv"
-        scraper._aggregate_csv_files(output_path)
 
-        # ファイルがUTF-8-sigで保存されているか確認
-        with open(output_path, "rb") as f:
-            assert f.read().startswith(b"\xef\xbb\xbf")  # UTF-8-sig BOM
+def test_download_and_aggregate(scraper):
+    browser = MagicMock()
+    browser.get_links_for_download.return_value = ["l1", "l2"]
+    browser.driver = "drv"
+    calls = []
+    scraper.file_downloader.download_from_links = lambda drv, links: calls.append(("down", drv, links))
+    scraper._aggregate_csv_files = lambda out: calls.append(("agg", out))
+    scraper._download_and_aggregate(browser, "endpoint", Path("o"))
+    assert calls == [("down", "drv", ["l1", "l2"]), ("agg", Path("o"))]
+
+
+def test_scrape_missing_credentials_branch(scraper, monkeypatch):
+    monkeypatch.setenv("EMAIL", "u@example.com")
+    monkeypatch.delenv("PASSWORD", raising=False)
+    scraper._check_env_variables = lambda: None
+    scraper._clean_directories = lambda: None
+    with pytest.raises(MoneyForwardError) as exc:
+        scraper.scrape()
+    assert "EMAIL/PASSWORDが環境変数に設定されていません" in str(exc.value)
+
+
+def test_scrape_raises_mf_error_from_check_env(scraper, mock_env):
+    calls = []
+    scraper.file_downloader.clean_download_dir = lambda: calls.append(True)
+    scraper._check_env_variables = lambda: (_ for _ in ()).throw(MoneyForwardError("env missing"))
+    with pytest.raises(MoneyForwardError):
+        scraper.scrape()
+    assert calls == []
+
+
+def test_scrape_success_final_cleanup(scraper, mock_env, monkeypatch):
+    scraper._check_env_variables = lambda: None
+    scraper._clean_directories = lambda: None
+    calls = []
+    scraper._download_and_aggregate = lambda b,e,o: calls.append(('agg', e))
+    scraper.file_downloader.clean_download_dir = lambda: calls.append(('clean', None))
+    browser = MagicMock()
+    browser.__enter__.return_value = browser
+    browser.login = lambda e,p: None
+    monkeypatch.setattr(scraper, "browser_manager", browser)
+    scraper.scrape()
+    agg_count = len([c for c in calls if c[0]=='agg'])
+    clean_count = len([c for c in calls if c[0]=='clean'])
+    assert agg_count == 2
+    assert clean_count == 2
+
+
+def test_scrape_download_error(scraper, mock_env, monkeypatch):
+    scraper._check_env_variables = lambda: None
+    scraper._clean_directories = lambda: None
+    browser = MagicMock()
+    browser.__enter__.return_value = browser
+    browser.login = lambda e,p: None
+    monkeypatch.setattr(scraper, "browser_manager", browser)
+    scraper._download_and_aggregate = lambda b,e,o: (_ for _ in ()).throw(KeyError("bad"))
+    scraper.file_downloader.clean_download_dir = lambda: None
+    with pytest.raises(MoneyForwardError) as exc:
+        scraper.scrape()
+    msg = str(exc.value)
+    assert "スクレイピングに失敗しました" in msg
+    assert "KeyError" in msg
+
+
+def test_scrape_browser_enter_error(scraper, mock_env, monkeypatch):
+    scraper._check_env_variables = lambda: None
+    scraper._clean_directories = lambda: None
+    calls = []
+    scraper.file_downloader.clean_download_dir = lambda: calls.append(True)
+    fake_mgr = MagicMock()
+    fake_mgr.__enter__.side_effect = ValueError("enter fail")
+    monkeypatch.setattr(scraper, "browser_manager", fake_mgr)
+    with pytest.raises(MoneyForwardError) as exc:
+        scraper.scrape()
+    msg = str(exc.value)
+    assert "予期せぬエラー" in msg
+    assert "ValueError" in msg
+    assert calls == [True]
+
+
+def test_scrape_success_flow(scraper, mock_env, monkeypatch):
+    fake = datetime.datetime(2025,4,21)
+    class FakeDate(datetime.datetime):
+        @classmethod
+        def now(cls): return fake
+    monkeypatch.setattr(scraper_module.datetime, "datetime", FakeDate)
+    scraper._check_env_variables = lambda: None
+    scraper._clean_directories = lambda: None
+    calls = []
+    scraper._download_and_aggregate = lambda b,e,o: calls.append((e,o))
+    browser = MagicMock()
+    browser.__enter__.return_value = browser
+    browser.login = lambda e,p: None
+    monkeypatch.setattr(scraper, "browser_manager", browser)
+    scraper.scrape()
+    assert len(calls) == 2

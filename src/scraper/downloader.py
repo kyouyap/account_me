@@ -163,58 +163,78 @@ class FileDownloader:
                 else:
                     # アカウントページの場合
                     logger.info("アカウントページへアクセス開始: %s", link)
-                    driver.get(link)
-                    driver.implicitly_wait(settings.moneyforward.selenium.timeout)
+                    month_files = []  # この月のダウンロードファイル
+                    
+                    try:
+                        driver.get(link)
+                        driver.implicitly_wait(settings.moneyforward.selenium.timeout)
 
-                    # 「今日」ボタンをクリック
-                    today_button = driver.find_element(
-                        By.CSS_SELECTOR,
-                        ".btn.fc-button.fc-button-today.spec-fc-button-click-attached",
-                    )
-                    today_button.click()
-
-                    # 設定された月数分のデータをダウンロード
-                    months = settings.moneyforward.history.months_to_download
-                    for j in range(months):
-                        logger.info(
-                            "過去のデータをダウンロード中: %d/%d（%d月前のデータ）",
-                            j + 1,
-                            months,
-                            j,
-                        )
-
-                        # 「前月」ボタンをクリック
-                        prev_button = driver.find_element(
+                        # 「今日」ボタンをクリック
+                        today_button = driver.find_element(
                             By.CSS_SELECTOR,
-                            ".btn.fc-button.fc-button-prev.spec-fc-button-click-attached",
+                            ".btn.fc-button.fc-button-today.spec-fc-button-click-attached",
                         )
-                        prev_button.click()
-                        driver.implicitly_wait(settings.moneyforward.selenium.timeout)
+                        today_button.click()
 
-                        # ダウンロードボタンをクリック
-                        download_button = driver.find_element(
-                            By.PARTIAL_LINK_TEXT, "ダウンロード"
-                        )
-                        download_button.click()
-                        driver.implicitly_wait(settings.moneyforward.selenium.timeout)
-
-                        # CSVファイルのリンクを取得
-                        csv_link = driver.find_element(
-                            By.PARTIAL_LINK_TEXT, "CSVファイル"
-                        ).get_attribute("href")
-
-                        if csv_link:
-                            output_path = self.download_dir / f"{base_name}_{i}_{j}.csv"
-                            downloaded_file = self.download_file(
-                                driver, csv_link, output_path
-                            )
-                            if downloaded_file and downloaded_file.exists():
-                                downloaded_files.append(downloaded_file)
+                        # 設定された月数分のデータをダウンロード
+                        months = settings.moneyforward.history.months_to_download
+                        for j in range(months):
+                            try:
                                 logger.info(
-                                    "ファイルのダウンロードが完了しました: %s（サイズ: %.2f KB）",
-                                    downloaded_file.name,
-                                    downloaded_file.stat().st_size / 1024,
+                                    "過去のデータをダウンロード中: %d/%d（%d月前のデータ）",
+                                    j + 1,
+                                    months,
+                                    j,
                                 )
+
+                                # 「前月」ボタンをクリック
+                                prev_button = driver.find_element(
+                                    By.CSS_SELECTOR,
+                                    ".btn.fc-button.fc-button-prev.spec-fc-button-click-attached",
+                                )
+                                prev_button.click()
+                                driver.implicitly_wait(settings.moneyforward.selenium.timeout)
+
+                                # ダウンロードボタンをクリック
+                                download_button = driver.find_element(
+                                    By.PARTIAL_LINK_TEXT, "ダウンロード"
+                                )
+                                download_button.click()
+                                driver.implicitly_wait(settings.moneyforward.selenium.timeout)
+
+                                # CSVファイルのリンクを取得
+                                csv_link = driver.find_element(
+                                    By.PARTIAL_LINK_TEXT, "CSVファイル"
+                                ).get_attribute("href")
+
+                                if csv_link:
+                                    output_path = self.download_dir / f"{base_name}_{i}_{j}.csv"
+                                    downloaded_file = self.download_file(
+                                        driver, csv_link, output_path
+                                    )
+                                    if downloaded_file and downloaded_file.exists():
+                                        month_files.append(downloaded_file)
+                                        logger.info(
+                                            "ファイルのダウンロードが完了しました: %s（サイズ: %.2f KB）",
+                                            downloaded_file.name,
+                                            downloaded_file.stat().st_size / 1024,
+                                        )
+                                    else:
+                                        logger.warning(f"{j}月目のファイルダウンロードに失敗しました")
+                            except Exception as month_error:
+                                logger.error(f"{j}月目のダウンロードでエラーが発生: {str(month_error)}")
+                                continue
+                        
+                        # 月次ダウンロードが1件でも成功していれば追加
+                        if month_files:
+                            downloaded_files.extend(month_files)
+                        else:
+                            logger.error("月次データのダウンロードが全て失敗しました")
+                            
+                    except Exception as account_error:
+                        logger.error(f"アカウントページの処理でエラーが発生: {str(account_error)}")
+                        if not downloaded_files:  # まだ1件もダウンロードできていない場合
+                            raise DownloadError(f"アカウントページの処理に失敗: {str(account_error)}")
 
             except Exception as e:
                 error_msg = str(e)
@@ -223,7 +243,9 @@ class FileDownloader:
                     link,
                     len(downloaded_files),
                 )
-                # ダウンロードの試行を続行
+                # 一部成功している場合は継続、全て失敗している場合は中断
+                if not downloaded_files:
+                    raise DownloadError(f"最初のダウンロードに失敗しました: {str(e)}")
                 continue
 
         if not downloaded_files and links:

@@ -3,7 +3,7 @@ ARG UV_VERSION=latest
 FROM ghcr.io/astral-sh/uv:$UV_VERSION AS uv
 
 
-FROM mcr.microsoft.com/vscode/devcontainers/python:3.13
+FROM python:3.13-slim-bullseye
 
 # 環境変数の設定
 ENV UV_PROJECT_ENVIRONMENT='/usr/local/'
