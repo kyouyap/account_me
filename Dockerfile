@@ -4,7 +4,6 @@ FROM ghcr.io/astral-sh/uv:$UV_VERSION AS uv
 
 FROM python:3.13-slim-bullseye
 
-
 # 環境変数の設定
 ENV EMAIL=${EMAIL}
 ENV PASSWORD=${PASSWORD}
@@ -15,10 +14,11 @@ ENV CHROME_DRIVER_PATH=/usr/bin/chromedriver
 ENV CHROME_PATH=/usr/bin/chromium
 
 # ベース依存関係のインストール
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget=1.21-1+deb11u1 \
     gnupg=2.2.27-2+deb11u2 \
-    apt-transport-https ca-certificates \
+    apt-transport-https=2.2.4 \
+    ca-certificates=20210119 \
     xvfb=2:1.20.11-1+deb11u15 \
     libgconf-2-4=3.2.6-7 \
     libnss3=2:3.61-1+deb11u4 \
@@ -30,18 +30,20 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud SDKインストール
-RUN apt-get update && apt-get install -y curl && \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/cloud.google.gpg > /dev/null && \
     apt-get update && \
-    apt-get install -y google-cloud-sdk && \
+    apt-get install -y --no-install-recommends google-cloud-sdk && \
     rm -rf /var/lib/apt/lists/*
 
 # ChromiumとChromeDriverのインストール
-# hadolint ignore=DL3008,DL3009,DL3015,DL4006
-SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
-    apt-get install -y chromium=120.0.6099.224-1~deb11u1 chromium-driver=120.0.6099.224-1~deb11u1; 
+    apt-get install -y --no-install-recommends chromium=120.0.6099.224-1~deb11u1 chromium-driver=120.0.6099.224-1~deb11u1 && \
+    rm -rf /var/lib/apt/lists/*
 
 # 最初に作業ディレクトリを設定
 WORKDIR /app
