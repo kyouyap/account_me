@@ -3,11 +3,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
-
 import config.secrets as secrets_mod
 import scraper.scraper as scraper_module
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
+
+# テスト用の定数定義
+TEST_CREDENTIALS = {
+    "EMAIL": "test@example.com",
+    "PASSWORD": "TEST_PASSWORD_123",  # 明確にテストデータであることを示す文字列
+}
 
 
 @pytest.fixture(autouse=True)
@@ -38,9 +43,9 @@ def scraper():
 @pytest.fixture
 def mock_env(monkeypatch):
     """テスト用の環境変数を設定。"""
-    monkeypatch.setenv("EMAIL", "user@example.com")
-    monkeypatch.setenv("PASSWORD", "pass123")
-    return {"EMAIL": "user@example.com", "PASSWORD": "pass123"}
+    monkeypatch.setenv("EMAIL", TEST_CREDENTIALS["EMAIL"])
+    monkeypatch.setenv("PASSWORD", TEST_CREDENTIALS["PASSWORD"])
+    return TEST_CREDENTIALS
 
 
 def test_init_calls_get_secrets(monkeypatch):

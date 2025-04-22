@@ -1,11 +1,13 @@
 {
     "name": "Account Me Development",
-    "dockerComposeFile": ["../docker-compose.yml"],
+    "dockerComposeFile": [
+        "../docker-compose.yml"
+    ],
     "service": "app",
     "workspaceFolder": "/app",
     "features": {
         "ghcr.io/dhoeric/features/hadolint:1": {}
-    },    
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -21,6 +23,25 @@
                 "4ops.terraform",
                 "ms-python.mypy-type-checker"
             ]
+        },
+        "settings": {
+            "python.defaultInterpreterPath": "/usr/local/bin/python",
+            "[python]": {
+                "editor.defaultFormatter": "charliermarsh.ruff",
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.ruff": "explicit",
+                    "source.organizeImports.ruff": "explicit"
+                },
+                "editor.formatOnSave": true
+            },
+            "files.insertFinalNewline": true,
+            "files.trimTrailingWhitespace": true,
+            "terminal.integrated.defaultProfile.linux": "zsh",
+            "terminal.integrated.profiles.linux": {
+                "zsh": {
+                    "path": "/bin/zsh"
+                }
+            }
         }
     },
     "remoteUser": "root"
