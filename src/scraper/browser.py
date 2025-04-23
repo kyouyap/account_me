@@ -221,17 +221,25 @@ class BrowserManager:
     def wait_for_new_verification_email(
         self, gmail_client: GmailClient, last_email_id: Optional[str] = None
     ) -> str:
-        """新しい認証メールの到着を待機。
+        """指定されたGmailアカウントに新しい認証メールが到着するのを待機します。
 
-        Args:
-            gmail_client: GmailClientインスタンス
-            last_email_id: 前回取得したメールID
+        GmailClientを使用して定期的に最新の認証メールIDを取得し、
+        指定された`last_email_id`（前回取得したメールID）と比較します。
+        新しいメールIDが`last_email_id`と異なる場合、または`last_email_id`がNoneの場合に、
+        新しいメールが到着したと判断し、そのIDを返します。
 
-        Returns:
-            str: 新しいメールID
+        最大`max_attempts`回まで、`wait_seconds`秒間隔でメールの到着を確認します。
+        メール検索中に一時的なエラーが発生した場合は、警告をログに出力し、リトライします。
+        指定された試行回数内に新しい認証メールが見つからなかった場合は、
+        タイムアウトとして`VerificationCodeError`を送出します。
 
-        Raises:
-            VerificationCodeError: 待機タイムアウト時
+            gmail_client (GmailClient): Gmailへのアクセスに使用するGmailClientインスタンス。
+            last_email_id (Optional[str]): 前回取得したメールのID。このIDと異なる最新のメールを探します。
+                                           Noneの場合は、最初に見つかった認証メールのIDを返します。
+
+            str: 新しく到着した認証メールのID。
+
+            VerificationCodeError: 指定された試行回数内に新しい認証メールが到着しなかった場合。
         """
         max_attempts = 10  # 最大待機回数
         wait_seconds = 3  # 待機間隔（秒）
@@ -292,7 +300,13 @@ class BrowserManager:
             logger.info("パスワードフォームを送信")
             password_input.submit()
             logger.info("パスワード送信完了")
+            # Gmail APIクライアントを初期化
+            logger.info("Gmail APIクライアントを初期化")
+            gmail_client = GmailClient()
 
+            # 現在の最新メールIDを取得
+            logger.info("現在の最新メールIDを取得")
+            last_email_id = gmail_client.get_latest_verification_email_id()
             # 2段階認証の確認
             try:
                 logger.info("2段階認証フォームの有無を確認")
@@ -315,14 +329,6 @@ class BrowserManager:
                                 "現在のページソース: %s", self.driver.page_source
                             )
                         raise
-
-                # Gmail APIクライアントを初期化
-                logger.info("Gmail APIクライアントを初期化")
-                gmail_client = GmailClient()
-
-                # 現在の最新メールIDを取得
-                logger.info("現在の最新メールIDを取得")
-                last_email_id = gmail_client.get_latest_verification_email_id()
 
                 # 送信後の新しいメールを待機
                 logger.info("新しい認証メールの到着を待機")

@@ -957,7 +957,6 @@ def test_create_gmail_service_build_error(monkeypatch):
                 GmailClient()
 
 
-# --- get_latest_verification_email_id の None / 空リスト / id 欠如 分岐 ---
 @pytest.mark.parametrize(
     "result,exc_type,match",
     [
@@ -968,8 +967,8 @@ def test_create_gmail_service_build_error(monkeypatch):
         ),  # execute() が None
         (
             {"messages": []},
-            VerificationCodeError,
-            "認証メールが見つかりません",
+            None,
+            None,
         ),  # 空リスト
         (
             {"messages": [{}]},
@@ -985,8 +984,11 @@ def test_get_latest_verification_email_id_missing_branches(
         gmail_client.service.users.return_value.messages.return_value.list.return_value
     )
     svc.execute.return_value = result
-    with pytest.raises(exc_type, match=match):
-        gmail_client.get_latest_verification_email_id()
+    if result == {"messages": []}:
+        assert gmail_client.get_latest_verification_email_id() is None
+    else:
+        with pytest.raises(exc_type, match=match):
+            gmail_client.get_latest_verification_email_id()
 
 
 # --- get_verification_code_by_id の socket.timeout 分岐 ---

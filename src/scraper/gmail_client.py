@@ -183,7 +183,7 @@ class GmailClient:
             logger.error("メッセージの解析中にエラーが発生: %s", e)
             raise VerificationCodeError(f"メッセージの解析に失敗: {e}") from e
 
-    def get_latest_verification_email_id(self) -> str:
+    def get_latest_verification_email_id(self) -> str | None:
         """最新の認証メールのIDを取得。
 
         Returns:
@@ -218,7 +218,7 @@ class GmailClient:
             logger.info("検索結果のメール数: %d", len(messages))
             if not messages:
                 logger.error("認証メールが見つかりませんでした")
-                raise VerificationCodeError("認証メールが見つかりません")
+                return None
 
             return messages[0]["id"]
 
