@@ -404,9 +404,33 @@ class BrowserManager:
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")
 
-        logger.info("アカウントページからダウンロードリンクの抽出を開始: %s", page_url)
+        logger.info("ページからダウンロードリンクの抽出を開始: %s", page_url)
         self.driver.get(page_url)
 
+        try:
+            # URLに基づいて処理を分岐
+            if "/accounts" in page_url:
+                logger.info("アカウントページ用の処理を実行します")
+                return self._extract_links_from_accounts_page()
+            elif "/bs/history" in page_url:
+                logger.info("履歴ページ用の処理を実行します")
+                return self._extract_links_from_history_page()
+            else:
+                logger.warning("未知のページタイプです: %s", page_url)
+                raise ScrapingError(f"未知のページタイプです: {page_url}")
+
+        except Exception as e:
+            raise ScrapingError(f"ダウンロードリンクの抽出に失敗しました: {e}") from e
+
+    def _extract_links_from_accounts_page(self) -> List[str]:
+        """アカウントページからリンクを抽出。
+
+        Returns:
+            List[str]: 抽出されたリンクのリスト。
+
+        Raises:
+            ScrapingError: リンクの抽出に失敗した場合。
+        """
         try:
             # アカウントテーブルを取得
             accounts_table = self.wait_and_find_element(By.CLASS_NAME, "accounts")  # type: ignore
@@ -454,12 +478,29 @@ class BrowserManager:
                     continue
 
             logger.info(
-                "リンクの抽出が完了しました。抽出されたリンク数: %d", len(links)
+                "アカウントページからのリンク抽出が完了しました。抽出されたリンク数: %d",
+                len(links),
             )
             return links
 
         except Exception as e:
-            raise ScrapingError(f"ダウンロードリンクの抽出に失敗しました: {e}") from e
+            logger.error("アカウントページからのリンク抽出に失敗しました: %s", e)
+            raise ScrapingError(
+                f"アカウントページからのリンク抽出に失敗しました: {e}"
+            ) from e
+
+    def _extract_links_from_history_page(self) -> List[str]:
+        """履歴ページからリンクを抽出。
+
+        Returns:
+            List[str]: 抽出されたリンクのリスト。
+
+        Raises:
+            ScrapingError: リンクの抽出に失敗した場合。
+        """
+        if not self.driver:
+            raise ScrapingError("WebDriverが初期化されていません。")
+        return [self.driver.current_url]
 
     def get_cookies(self) -> List[dict]:
         """現在のセッションのクッキー情報を取得。

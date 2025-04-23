@@ -155,7 +155,9 @@ def test_get_links_for_download_with_element_error(browser_manager):
     ):
         mock_find.return_value = mock_accounts_table
         with pytest.raises(ScrapingError) as exc_info:
-            browser_manager.get_links_for_download("http://example.com")
+            # URLを/accountsに変更
+            browser_manager.get_links_for_download("http://example.com/accounts")
+        # 実装の例外メッセージに合わせて修正
         assert "テーブルの行データの抽出に失敗しました" in str(exc_info.value)
 
 
@@ -373,7 +375,8 @@ def test_get_links_for_download_success(browser_manager):
     ):
         mock_find.side_effect = [mock_table]
 
-        links = browser_manager.get_links_for_download("http://example.com")
+        # URLを/accountsに変更
+        links = browser_manager.get_links_for_download("http://example.com/accounts")
         assert len(links) == 1
         assert links[0] == "http://example.com/download"
 
@@ -395,7 +398,8 @@ def test_get_links_for_download_no_links(browser_manager):
     ):
         mock_find.return_value = mock_table
 
-        links = browser_manager.get_links_for_download("http://example.com")
+        # URLを/accountsに変更
+        links = browser_manager.get_links_for_download("http://example.com/accounts")
         assert len(links) == 0
 
 
@@ -409,7 +413,7 @@ def test_get_links_for_download_failure(browser_manager):
         mock_find.side_effect = ScrapingError("要素が見つかりません")
 
         with pytest.raises(ScrapingError) as exc_info:
-            browser_manager.get_links_for_download("http://example.com")
+            browser_manager.get_links_for_download("http://example.com/accounts")
         assert "ダウンロードリンクの抽出に失敗しました" in str(exc_info.value)
 
 
