@@ -181,3 +181,5 @@ terraform.tfstate
 terraform/terraform.tfvars
 config/credential.json
 credentials
+error_page.html
+page_source.html

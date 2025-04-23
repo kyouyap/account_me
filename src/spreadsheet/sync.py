@@ -1,6 +1,7 @@
 """スプレッドシート同期モジュール。"""
 
 import datetime
+import json
 import logging
 import os
 from pathlib import Path
@@ -39,8 +40,9 @@ class SpreadsheetSync:
                     "https://spreadsheets.google.com/feeds",
                     "https://www.googleapis.com/auth/drive",
                 ]
-                credentials = ServiceAccountCredentials.from_json_keyfile_name(
-                    settings.paths.credentials, scope
+                credentials_info = json.loads(os.getenv("SPREADSHEET_CREDENTIAL_JSON"))  # type: ignore
+                credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+                    credentials_info, scope
                 )
                 self._client = gspread.authorize(credentials)
             except Exception as e:
@@ -57,6 +59,10 @@ class SpreadsheetSync:
         """
         if not os.getenv("SPREADSHEET_KEY"):
             raise SpreadsheetError("SPREADSHEET_KEYが環境変数に設定されていません。")
+        if not os.getenv("SPREADSHEET_CREDENTIAL_JSON"):
+            raise SpreadsheetError(
+                "SPREADSHEET_CREDENTIAL_JSONが環境変数に設定されていません。"
+            )
 
     def _load_household_data(self, date: datetime.datetime) -> pd.DataFrame:
         """家計簿データを読み込む。
@@ -189,36 +195,36 @@ class SpreadsheetSync:
 
     def sync(self) -> None:
         """スプレッドシートの同期を実行。"""
+        self._check_env_variables()
+        spreadsheet_key = os.getenv("SPREADSHEET_KEY")
+        if not spreadsheet_key:
+            raise SpreadsheetError("SPREADSHEET_KEYが環境変数に設定されていません。")
+
+        # スプレッドシートに接続
+        client = self._get_client()
+        spreadsheet = client.open_by_key(spreadsheet_key)
+
+        # 現在の日付を取得
+        current_date = datetime.datetime.now()
+
+        # 家計簿データの同期
         try:
-            self._check_env_variables()
-            spreadsheet_key = os.getenv("SPREADSHEET_KEY")
-            if not spreadsheet_key:
-                raise SpreadsheetError(
-                    "SPREADSHEET_KEYが環境変数に設定されていません。"
-                )
-
-            # スプレッドシートに接続
-            client = self._get_client()
-            spreadsheet = client.open_by_key(spreadsheet_key)
-
-            # 現在の日付を取得
-            current_date = datetime.datetime.now()
-
-            # 家計簿データの同期
             household_data = self._load_household_data(current_date)
             household_worksheet = spreadsheet.worksheet(
                 settings.spreadsheet.worksheets.household_data.name
             )
             self._update_household_data(household_worksheet, household_data)
             logger.info("家計簿データを同期しました。")
+        except Exception as e:
+            logger.error(f"家計簿データの同期に失敗しました: {e}")
 
-            # 資産データの同期
+        # 資産データの同期
+        try:
             assets_data = self._load_assets_data(current_date)
             assets_worksheet = spreadsheet.worksheet(
                 settings.spreadsheet.worksheets.assets_data.name
             )
             self._update_assets_data(assets_worksheet, assets_data)
             logger.info("資産データを同期しました。")
-
         except Exception as e:
-            raise SpreadsheetError(f"スプレッドシートの同期に失敗しました: {e}") from e
+            logger.error(f"資産データの同期に失敗しました: {e}")

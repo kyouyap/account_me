@@ -61,41 +61,49 @@
   参考用スプレッドシート:
   [https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0](https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0)
 
-### GCP 認証キー発行手順
-Google Sheets APIを利用してスプレッドシートの編集権限を得るため、以下のステップで認証キー（JSON）を発行します。
+### GCP認証情報の自動生成・管理手順（Terraformベース最新構成）
 
-1. **Google Cloud Consoleにアクセス**
-   - [https://console.cloud.google.com/](https://console.cloud.google.com/) にアクセスし、Googleアカウントでログインします。
+このプロジェクトでは、Google Sheets用・Gmail用で用途ごとにサービスアカウントを分けて作成し、それぞれの認証情報（JSON鍵）はTerraformで自動生成・Google Secret Managerに安全に格納します。手動でJSONファイルをダウンロード・配置する必要はありません。
 
-2. **プロジェクトの作成または選択**
-   - 新しいプロジェクトを作成するか、既存のプロジェクトを選択します。
+#### 1. 必要なAPIの有効化
+- Google Cloud Consoleでプロジェクトを選択し、以下のAPIを有効化してください：
+  - Google Sheets API
+  - Gmail API
+  - Secret Manager API
+  - BigQuery API
+  - Cloud Storage API
 
-3. **Google Sheets APIの有効化**
-   - 左側のナビゲーションメニューから「APIとサービス」→「ライブラリ」を選択します。
-   - 「Google Sheets API」を検索し、有効化します。
+#### 2. 認証情報の準備・管理方針
+- **Spreadsheet用**：サービスアカウントをTerraformで自動生成し、その鍵情報（JSON）をSecret Managerに自動格納します。
+- **Gmail用**：OAuthクライアントID/シークレット（ユーザー認可型認証情報）はGoogle Cloud Consoleから手動で発行し、そのJSONをTerraformでSecret Managerに格納します。
+  - ※GmailのOAuthクライアントID/シークレットは現状Terraform等での自動発行はできません。Google Cloud Consoleの「認証情報」画面から手動で取得してください。
 
-4. **認証情報の作成**
-   - 「APIとサービス」→「認証情報」に移動し、「認証情報を作成」ボタンをクリックします。
-   - 「サービス アカウント」を選択します。
+#### 3. デプロイ手順
+1. 必要な変数（特に `gmail_credentials_file` には手動発行したOAuthクライアントJSONのパス）を `terraform/terraform.tfvars` で設定
+2. 以下のコマンドでTerraformを実行し、インフラと認証情報を構築します：
+   ```sh
+   cd terraform
+   terraform init
+   terraform apply
+   ```
+3. 実行後、Google Secret Managerに以下のようなシークレットが作成されます：
+   - `spreadsheet-credential` : Spreadsheet用サービスアカウントの認証情報
+   - `gmail-api-credentials` : Gmail用OAuthクライアント認証情報
 
-5. **サービスアカウントの設定**
-   - サービスアカウントの名前、ID、説明を入力します。
-     ※ガード句を利用し、不要なネストや冗長なコメントを避けながら記述してください。
-   - 「作成と続行」をクリックします。
+#### 4. アプリケーションからの認証情報取得
+- Pythonアプリ等からは、Secret Manager経由で認証情報を取得し、環境変数や設定で利用します。
+- `.env`や`config/settings.yaml`でファイルパスを指定する必要はありません。
+- 例：
+  - `SPREADSHEET_CREDENTIAL_JSON` 環境変数にSecret Managerから取得したJSONを格納
+  - `GMAIL_CREDENTIALS` も同様
 
-6. **ロールの割り当て**
-   - 「ロールを選択」のドロップダウンから「Google Sheets API 編集者」もしくはプロジェクトに適した編集権限のロールを選択します。
-     ※必要に応じてカスタムロールの利用も検討してください。
-   - 「続行」をクリックします。
+#### 5. 注意事項
+- Gmail APIのOAuthクライアントID/シークレットは手動発行が必要ですが、一度Secret Managerに格納すれば以降は自動的に安全に運用できます。
+- サービスアカウント型はGmail APIの一部機能に非対応のため、ユーザー認可型（OAuthクライアント）を利用しています。
 
-7. **サービスアカウントキーの作成**
-   - サービスアカウントが作成されたら、その詳細画面に移動し、「キー」タブを選択します。
-   - 「キーを追加」→「新しいキーを作成」を選択し、キータイプに「JSON」を指定します。
-   - 自動的にJSON形式の認証キーがダウンロードされます。
+---
 
-8. **認証キーの配置と設定**
-   - ダウンロードしたJSONファイルを、プロジェクト内の適切なディレクトリ（例：`config/keys/`）に配置します。
-   - 設定ファイル（例：`config/settings.yaml`）または環境変数で、認証キーのパスを指定して参照できるようにします。
+これにより、認証情報の手動管理・配置ミスのリスクがなくなり、安全かつ自動的にインフラ・認証基盤が整います。
 
 ### 実装とテスト
 1. Seleniumを利用したMoneyForwardからのデータ取得処理を実装

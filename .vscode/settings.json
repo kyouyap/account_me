@@ -1,5 +1,7 @@
 {
     "python.testing.pytestArgs": [
+        "-n",
+        "auto",
         "."
     ],
     "python.testing.unittestEnabled": false,
