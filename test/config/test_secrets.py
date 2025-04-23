@@ -8,14 +8,14 @@ from exceptions.custom_exceptions import ConfigurationError
 from config.secrets import get_project_number, get_secrets, update_secret
 
 
-@pytest.fixture
-def mock_gcloud_success(mocker):
-    """正常系のgcloudコマンドをモック化するフィクスチャ。"""
+@pytest.fixture(autouse=True)
+def mock_gcloud_global(mocker):
+    """全テストで使用するgcloudコマンドのモック。"""
     mock_run = mocker.patch("subprocess.run")
     mock_run.side_effect = [
         Mock(stdout="test-project-id\n", check=True),  # プロジェクトID
         Mock(stdout="123456789\n", check=True),  # プロジェクト番号
-    ]
+    ] * 10  # 複数回の呼び出しに対応
     return mock_run
 
 
@@ -37,13 +37,13 @@ def mock_secret_manager(mocker):
 class TestGetProjectNumber:
     """get_project_number()のテストクラス。"""
 
-    def test_success(self, mock_gcloud_success):
+    def test_success(self, mock_gcloud_global):
         """正常系: プロジェクト番号が正しく取得できる。"""
         result = get_project_number()
         assert result == "123456789"
-        assert mock_gcloud_success.call_count == 2
+        assert mock_gcloud_global.call_count == 2
 
-    def test_cache(self, mock_gcloud_success, mocker):
+    def test_cache(self, mock_gcloud_global, mocker):
         """2回目の呼び出しではキャッシュされた値が返される。"""
         # _project_numberをリセット
         mocker.patch("config.secrets._project_number", None)
@@ -52,13 +52,16 @@ class TestGetProjectNumber:
         result = get_project_number()
         assert result == "123456789"
         # 1回目の呼び出しで2回コマンドが実行され、2回目の呼び出しではキャッシュを使用
-        assert mock_gcloud_success.call_count == 2
+        assert mock_gcloud_global.call_count == 2
 
     def test_empty_project_id(self, mocker):
         """異常系: プロジェクトIDが空の場合。"""
         # _project_numberをリセット
         mocker.patch("config.secrets._project_number", None)
 
+        # グローバルモックをリセット
+        mocker.resetall()
+        # 個別のモックを設定
         mock_run = mocker.patch("subprocess.run")
         mock_run.return_value = Mock(stdout="\n", check=True)
 
@@ -72,6 +75,9 @@ class TestGetProjectNumber:
         # _project_numberをリセット
         mocker.patch("config.secrets._project_number", None)
 
+        # グローバルモックをリセット
+        mocker.resetall()
+        # 個別のモックを設定
         mock_run = mocker.patch("subprocess.run")
         mock_run.side_effect = [
             Mock(stdout="test-project-id\n", check=True),
@@ -88,6 +94,9 @@ class TestGetProjectNumber:
         # _project_numberをリセット
         mocker.patch("config.secrets._project_number", None)
 
+        # グローバルモックをリセット
+        mocker.resetall()
+        # 個別のモックを設定
         mock_run = mocker.patch("subprocess.run")
         mock_run.side_effect = subprocess.CalledProcessError(
             1, "command", output="error"
