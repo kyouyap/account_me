@@ -6,7 +6,8 @@
     "service": "app",
     "workspaceFolder": "/app",
     "features": {
-        "ghcr.io/dhoeric/features/hadolint:1": {}
+        "ghcr.io/dhoeric/features/hadolint:1": {},
+        "ghcr.io/devcontainers/features/git:1": {}
     },
     "customizations": {
         "vscode": {
