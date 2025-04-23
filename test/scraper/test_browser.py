@@ -27,6 +27,48 @@ def browser_manager():
     return BrowserManager()
 
 
+@pytest.fixture
+def mock_gmail_client():
+    """GmailClientのモックを提供するフィクスチャ。"""
+    mock = MagicMock(spec=GmailClient)
+    mock.get_latest_verification_email_id.return_value = "test_email_id"
+    return mock
+
+
+@pytest.fixture
+def mock_form_elements():
+    """フォーム要素のモックを提供するフィクスチャ。"""
+    return {"email": MagicMock(), "password": MagicMock(), "code": MagicMock()}
+
+
+@pytest.fixture
+def mock_browser_setup(browser_manager, mock_gmail_client, mock_form_elements):
+    """ブラウザのセットアップを提供するフィクスチャ。"""
+    mock_driver = MagicMock()
+    mock_driver.page_source = "mock page source"
+    elements = mock_form_elements
+
+    with patch(
+        "scraper.browser.GmailClient", return_value=mock_gmail_client
+    ), patch.object(browser_manager, "driver", mock_driver), patch(
+        "builtins.open", mock_open()
+    ) as mock_file:
+        yield {
+            "driver": mock_driver,
+            "gmail": mock_gmail_client,
+            "elements": elements,
+            "mock_file": mock_file,
+        }
+
+
+@pytest.fixture
+def mock_login_setup(mock_browser_setup):
+    """ログインテスト用のセットアップ。"""
+    mock_success_element = MagicMock()
+    mock_browser_setup["success_element"] = mock_success_element
+    return mock_browser_setup
+
+
 def test_init(browser_manager):
     """初期化のテスト。"""
     assert browser_manager.driver is None
@@ -36,11 +78,9 @@ def test_init(browser_manager):
 
 def test_context_manager(browser_manager):
     """コンテキストマネージャーのテスト。"""
-    with (
-        patch("selenium.webdriver.Chrome") as mock_chrome,
-        patch("selenium.webdriver.chrome.service.Service"),
-        patch("os.path.exists", return_value=True),
-    ):
+    with patch("selenium.webdriver.Chrome") as mock_chrome, patch(
+        "selenium.webdriver.chrome.service.Service"
+    ), patch("os.path.exists", return_value=True):
         mock_driver = MagicMock()
         mock_driver.page_source = "mock page source"
         mock_chrome.return_value = mock_driver
@@ -56,11 +96,9 @@ def test_context_manager(browser_manager):
 
 def test_setup_driver_success(browser_manager):
     """WebDriver設定の成功テスト。"""
-    with (
-        patch("selenium.webdriver.Chrome") as mock_chrome,
-        patch("selenium.webdriver.chrome.service.Service"),
-        patch("os.path.exists", return_value=True),
-    ):
+    with patch("selenium.webdriver.Chrome") as mock_chrome, patch(
+        "selenium.webdriver.chrome.service.Service"
+    ), patch("os.path.exists", return_value=True):
         mock_driver = MagicMock()
         mock_chrome.return_value = mock_driver
 
@@ -149,10 +187,9 @@ def test_get_links_for_download_with_element_error(browser_manager):
     )
     mock_accounts_table.find_element.return_value = mock_table
 
-    with (
-        patch.object(browser_manager, "driver", mock_driver),
-        patch.object(browser_manager, "wait_and_find_element") as mock_find,
-    ):
+    with patch.object(browser_manager, "driver", mock_driver), patch.object(
+        browser_manager, "wait_and_find_element"
+    ) as mock_find:
         mock_find.return_value = mock_accounts_table
         with pytest.raises(ScrapingError) as exc_info:
             # URLを/accountsに変更
@@ -226,67 +263,52 @@ def test_retry_operation_all_failures(browser_manager):
     assert mock_operation.call_count == browser_manager.retry_count
 
 
-def test_login_success_with_2fa(browser_manager):
+def test_login_success_with_2fa(
+    browser_manager, mock_browser_setup, mock_form_elements
+):
     """2段階認証を含むログイン成功のテスト。"""
-    mock_driver = MagicMock()
-    mock_driver.page_source = "mock page source"
-    mock_email_input = MagicMock()
-    mock_password_input = MagicMock()
-    mock_code_input = MagicMock()
-    mock_success_element = MagicMock()
-
-    mock_gmail_client = MagicMock(spec=GmailClient)
-    mock_gmail_client.get_latest_verification_email_id.side_effect = [
+    mock_setup = mock_browser_setup
+    mock_setup["gmail"].get_latest_verification_email_id.side_effect = [
         "old_email_id",
         "new_email_id",
     ]
-    mock_gmail_client.get_verification_code_by_id.return_value = "123456"
+    mock_setup["gmail"].get_verification_code_by_id.return_value = "123456"
 
-    with (
-        patch.object(browser_manager, "driver", mock_driver),
-        patch.object(browser_manager, "wait_and_find_element") as mock_find,
-        patch("scraper.browser.GmailClient", return_value=mock_gmail_client),
-    ):
+    mock_success_element = MagicMock()
+    with patch.object(browser_manager, "wait_and_find_element") as mock_find:
         mock_find.side_effect = [
-            mock_email_input,
-            mock_password_input,
-            mock_code_input,
+            mock_form_elements["email"],
+            mock_form_elements["password"],
+            mock_form_elements["code"],
             mock_success_element,
         ]
 
         browser_manager.login("test@example.com", "password123")
 
         # 各要素への操作を確認
-        mock_email_input.send_keys.assert_called_with("test@example.com")
-        mock_email_input.submit.assert_called_once()
-        mock_password_input.send_keys.assert_called_with("password123")
-        mock_password_input.submit.assert_called_once()
-        mock_code_input.send_keys.assert_called_with("123456")
-        mock_code_input.submit.assert_called_once()
+        mock_form_elements["email"].send_keys.assert_called_with("test@example.com")
+        mock_form_elements["email"].submit.assert_called_once()
+        mock_form_elements["password"].send_keys.assert_called_with("password123")
+        mock_form_elements["password"].submit.assert_called_once()
+        mock_form_elements["code"].send_keys.assert_called_with("123456")
+        mock_form_elements["code"].submit.assert_called_once()
 
 
-def test_login_2fa_code_expired(browser_manager):
+def test_login_2fa_code_expired(
+    browser_manager, mock_browser_setup, mock_form_elements
+):
     """2段階認証コードの有効期限切れのテスト。"""
-    mock_driver = MagicMock()
-    mock_email_input = MagicMock()
-    mock_password_input = MagicMock()
-    mock_code_input = MagicMock()
-
-    mock_gmail_client = MagicMock(spec=GmailClient)
-    mock_gmail_client.get_latest_verification_email_id.return_value = "test_email_id"
-    mock_gmail_client.get_verification_code_by_id.side_effect = VerificationCodeError(
+    mock_setup = mock_browser_setup
+    mock_setup["gmail"].get_latest_verification_email_id.return_value = "test_email_id"
+    mock_setup["gmail"].get_verification_code_by_id.side_effect = VerificationCodeError(
         "認証コードの有効期限が切れています"
     )
 
-    with (
-        patch.object(browser_manager, "driver", mock_driver),
-        patch.object(browser_manager, "wait_and_find_element") as mock_find,
-        patch("scraper.browser.GmailClient", return_value=mock_gmail_client),
-    ):
+    with patch.object(browser_manager, "wait_and_find_element") as mock_find:
         mock_find.side_effect = [
-            mock_email_input,
-            mock_password_input,
-            mock_code_input,
+            mock_form_elements["email"],
+            mock_form_elements["password"],
+            mock_form_elements["code"],
         ]
 
         with pytest.raises(AuthenticationError) as exc_info:
@@ -294,9 +316,8 @@ def test_login_2fa_code_expired(browser_manager):
         assert "2段階認証に失敗しました" in str(exc_info.value)
 
 
-def test_wait_for_new_verification_email_success(browser_manager):
+def test_wait_for_new_verification_email_success(browser_manager, mock_gmail_client):
     """新しい認証メール待機の成功テスト。"""
-    mock_gmail_client = MagicMock(spec=GmailClient)
     mock_gmail_client.get_latest_verification_email_id.side_effect = [
         "old_id",
         "new_id",
@@ -309,36 +330,36 @@ def test_wait_for_new_verification_email_success(browser_manager):
     assert mock_gmail_client.get_latest_verification_email_id.call_count == 2
 
 
-def test_wait_for_new_verification_email_timeout(browser_manager):
+def test_wait_for_new_verification_email_timeout(browser_manager, mock_gmail_client):
     """認証メール待機のタイムアウトテスト。"""
-    mock_gmail_client = MagicMock(spec=GmailClient)
-    mock_gmail_client.get_latest_verification_email_id.return_value = "old_id"
+    with patch("time.sleep", return_value=None):
+        mock_gmail_client.get_latest_verification_email_id.return_value = "old_id"
 
-    with pytest.raises(VerificationCodeError) as exc_info:
-        browser_manager.wait_for_new_verification_email(mock_gmail_client, "old_id")
-    assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
+        with pytest.raises(VerificationCodeError) as exc_info:
+            browser_manager.wait_for_new_verification_email(mock_gmail_client, "old_id")
+        assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
 
 
 def test_wait_for_new_verification_email_api_error(browser_manager):
-    """Gmail APIエラー時のテスト。"""
-    mock_gmail_client = MagicMock(spec=GmailClient)
-    mock_gmail_client.get_latest_verification_email_id.side_effect = GmailApiError(
-        "API Error"
-    )
+    with patch("time.sleep", return_value=None):
+        """Gmail APIエラー時のテスト。"""
+        mock_gmail_client = MagicMock(spec=GmailClient)
+        mock_gmail_client.get_latest_verification_email_id.side_effect = GmailApiError(
+            "API Error"
+        )
 
-    with pytest.raises(VerificationCodeError) as exc_info:
-        browser_manager.wait_for_new_verification_email(mock_gmail_client)
-    assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
+        with pytest.raises(VerificationCodeError) as exc_info:
+            browser_manager.wait_for_new_verification_email(mock_gmail_client)
+        assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
 
 
-def test_login_failure(browser_manager):
+def test_login_failure(browser_manager, mock_browser_setup):
     """ログイン失敗のテスト。"""
-    mock_driver = MagicMock()
-    mock_driver.page_source = "mock page source"
-    with (
-        patch.object(browser_manager, "driver", mock_driver),
-        patch.object(browser_manager, "wait_and_find_element") as mock_find,
-        patch("builtins.open", mock_open()),
+    mock_setup = mock_browser_setup
+    mock_setup["driver"].page_source = "mock page source"
+
+    with patch.object(browser_manager, "wait_and_find_element") as mock_find, patch(
+        "builtins.open", mock_open()
     ):
         mock_find.side_effect = TimeoutException("タイムアウト")
 
