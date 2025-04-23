@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - app-data:/app/downloads
+      - app-logs:/app/log
+      - app-outputs:/app/outputs
+      - ~/.config/gcloud:/root/.config/gcloud
+      - ~/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json
+    tty: true
+    stdin_open: true
+    command: /bin/sh
+
+volumes:
+  app-data:
+  app-logs:
+  app-outputs:

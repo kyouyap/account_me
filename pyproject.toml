@@ -5,7 +5,7 @@ description = "Add your description here"
 authors = [
     { name = "kyouyap" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "gspread-dataframe>=4.0.0",
@@ -17,6 +17,12 @@ dependencies = [
     "types-pyyaml>=6.0.12.20241230",
     "pandas-stubs>=2.2.3.250308",
     "pyyaml>=6.0.2",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "google-api-python-client>=2.88.0",
+    "google-auth-oauthlib>=1.0.0",
+    "google-auth-httplib2>=0.1.0",
+    "google-cloud-secret-manager>=2.16.0",
 ]
 
 [tool.mypy]

@@ -1,6 +1,14 @@
 """カスタム例外モジュール。"""
 
 
+class GmailApiError(Exception):
+    """Gmail API関連のエラー。"""
+
+
+class VerificationCodeError(GmailApiError):
+    """認証コード取得に関するエラー。"""
+
+
 class MoneyForwardError(Exception):
     """MoneyForwardスクレイピング関連の基底例外クラス。"""
 

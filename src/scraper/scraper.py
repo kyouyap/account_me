@@ -25,13 +25,18 @@ class MoneyForwardScraper:
         self.browser_manager = BrowserManager()
         self.file_downloader = FileDownloader(self.download_dir)
 
+        # シークレットを環境変数に設定
+        from config.secrets import get_secrets
+
+        get_secrets()
+
     def _check_env_variables(self) -> None:
         """必要な環境変数が設定されているか確認します。
 
         Raises:
             MoneyForwardError: 必要な環境変数が設定されていない場合。
         """
-        required_vars = ["EMAIL", "PASSWORD", "SELENIUM_URL"]
+        required_vars = ["EMAIL", "PASSWORD"]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
             raise MoneyForwardError(
@@ -137,48 +142,84 @@ class MoneyForwardScraper:
         Raises:
             MoneyForwardError: CSVファイルの集約に失敗した場合。
         """
+        try:
+            # CSVファイルを読み込んで結合
+            all_dfs: List[pd.DataFrame] = []
+            csv_files = list(self.download_dir.glob("*.csv"))
+            logger.info("集約対象のCSVファイル数: %d", len(csv_files))
 
-        # CSVファイルを読み込んで結合
-        all_dfs: List[pd.DataFrame] = []
-        csv_files = list(self.download_dir.glob("*.csv"))
-        logger.info("集約対象のCSVファイル数: %d", len(csv_files))
+            for file_path in csv_files:
+                logger.info("ファイル '%s' の処理を開始", file_path)
+                try:
+                    df = self._read_csv_with_encoding(file_path)
+                    if df is not None:
+                        if "金額（円）" in df.columns and "保有金融機関" in df.columns:
+                            # 金額カラムを事前に浮動小数点数型に変換
+                            df["金額（円）"] = df["金額（円）"].astype(float)
+                            # 初期設定ではアメリカン・エキスプレスカードの金額を半額に
+                            for rule in settings.moneyforward.special_rules:
+                                if rule.action == "divide_amount":
+                                    mask = df["保有金融機関"] == rule.institution
+                                    df.loc[mask, "金額（円）"] = (
+                                        df.loc[mask, "金額（円）"] / rule.value
+                                    )
+                        all_dfs.append(df)
+                except Exception as e:
+                    logger.error(
+                        f"ファイル '{file_path}' の処理中にエラーが発生しました:",
+                        exc_info=True,
+                    )
+                    raise MoneyForwardError(
+                        f"CSVファイルの処理に失敗しました: {str(e)}"
+                    ) from e
 
-        for file_path in csv_files:
-            logger.info("ファイル '%s' の処理を開始", file_path)
-            df = self._read_csv_with_encoding(file_path)
-            if df is not None:
-                if "金額（円）" in df.columns and "保有金融機関" in df.columns:
-                    # 金額カラムを事前に浮動小数点数型に変換
-                    df["金額（円）"] = df["金額（円）"].astype(float)
-                    # 初期設定ではアメリカン・エキスプレスカードの金額を半額に
-                    for rule in settings.moneyforward.special_rules:
-                        if rule.action == "divide_amount":
-                            mask = df["保有金融機関"] == rule.institution
-                            df.loc[mask, "金額（円）"] = (
-                                df.loc[mask, "金額（円）"] / rule.value
-                            )
-                all_dfs.append(df)
+            if all_dfs:
+                # データを結合して重複を削除
+                final_df = pd.concat(all_dfs).drop_duplicates().reset_index(drop=True)
 
-        if all_dfs:
-            # データを結合して重複を削除
-            final_df = pd.concat(all_dfs).drop_duplicates().reset_index(drop=True)
+                # ディレクトリが存在しない場合は作成
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # ディレクトリが存在しない場合は作成
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+                # CSVファイルとして保存
+                final_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+                logger.info(
+                    "CSVファイルを集約しました: %s（レコード数: %d）",
+                    output_path,
+                    len(final_df),
+                )
+            else:
+                logger.warning("集約するCSVファイルがありません。")
+                return
 
-            # CSVファイルとして保存
-            final_df.to_csv(output_path, index=False, encoding="utf-8-sig")
-            logger.info(
-                "CSVファイルを集約しました: %s（レコード数: %d）",
-                output_path,
-                len(final_df),
-            )
-        else:
-            logger.warning("集約するCSVファイルがありません。")
-            return
+        except Exception as e:
+            logger.error("CSVファイルの集約中にエラーが発生しました:", exc_info=True)
+            raise MoneyForwardError(f"CSVファイルの集約に失敗しました: {str(e)}") from e
+
+    def _download_and_aggregate(
+        self, browser: BrowserManager, endpoint: str, output_path: Path
+    ) -> None:
+        """指定されたエンドポイントからデータをダウンロードし集約します。
+
+        Args:
+            browser: ブラウザマネージャー
+            endpoint: ダウンロード対象のエンドポイント
+            output_path: 出力先のパス
+
+        Raises:
+            MoneyForwardError: データのダウンロードや集約に失敗した場合
+        """
+        links = browser.get_links_for_download(endpoint)
+        logger.info("ダウンロードリンクを取得しました: %d件", len(links))
+
+        self.file_downloader.download_from_links(browser.driver, links)
+        self._aggregate_csv_files(output_path)
 
     def scrape(self) -> None:
-        """スクレイピングを実行します。"""
+        """スクレイピングを実行します。
+
+        Raises:
+            MoneyForwardError: スクレイピング処理に失敗した場合
+        """
         try:
             self._check_env_variables()
             self._clean_directories()
@@ -192,37 +233,50 @@ class MoneyForwardScraper:
                     "EMAIL/PASSWORDが環境変数に設定されていません。"
                 )
 
+            base_url = settings.moneyforward.base_url
+
             with self.browser_manager as browser:
-                # ログインしてリンクを取得
-                browser.login(email, password)
-                links = browser.get_links_for_download(
-                    f"{settings.moneyforward.base_url}{settings.moneyforward.endpoints.accounts}"
-                )
-                logger.info("ダウンロードリンクを取得しました: %d件", len(links))
+                try:
+                    browser.login(email, password)
 
-                # アカウントページからのダウンロード
-                self.file_downloader.download_from_links(browser.driver, links)
-                detail_output = (
-                    Path(settings.paths.outputs.aggregated_files.detail)
-                    / f"detail_{current_date}.csv"
-                )
-                self._aggregate_csv_files(detail_output)
+                    # アカウントページ処理
+                    detail_endpoint = (
+                        f"{base_url}{settings.moneyforward.endpoints.accounts}"
+                    )
+                    detail_output = (
+                        Path(settings.paths.outputs.aggregated_files.detail)
+                        / f"detail_{current_date}.csv"
+                    )
+                    self._download_and_aggregate(
+                        browser, detail_endpoint, detail_output
+                    )
 
-                # 履歴ページからのダウンロード
-                self.file_downloader.clean_download_dir()
-                history_links = [
-                    f"{settings.moneyforward.base_url}{settings.moneyforward.endpoints.history}"
-                ]
-                self.file_downloader.download_from_links(browser.driver, history_links)
-                assets_output = (
-                    Path(settings.paths.outputs.aggregated_files.assets)
-                    / f"assets_{current_date}.csv"
-                )
-                self._aggregate_csv_files(assets_output)
+                    # 履歴ページ処理
+                    self.file_downloader.clean_download_dir()
+                    history_endpoint = (
+                        f"{base_url}{settings.moneyforward.endpoints.history}"
+                    )
+                    assets_output = (
+                        Path(settings.paths.outputs.aggregated_files.assets)
+                        / f"assets_{current_date}.csv"
+                    )
+                    self._download_and_aggregate(
+                        browser, history_endpoint, assets_output
+                    )
+                except Exception as e:
+                    logger.error("ブラウザ操作中にエラーが発生しました:", exc_info=True)
+                    error_message = f"スクレイピングに失敗しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+                    raise MoneyForwardError(error_message) from e
 
             self.file_downloader.clean_download_dir()
             logger.info("スクレイピングが完了しました。")
 
+        except MoneyForwardError:
+            raise
         except Exception as e:
+            logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
-            raise MoneyForwardError(f"スクレイピングに失敗しました: {e}") from e
+            error_message = (
+                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+            )
+            raise MoneyForwardError(error_message) from e

@@ -1,4 +1,4 @@
-default_stages: [commit]
+default_stages: [pre-commit]
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.5
@@ -24,10 +24,18 @@ repos:
 
   - repo: local
     hooks:
+      - id: mypy
+        name: Run mypy
+        entry: mypy src/ test/
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: pytest
         name: Run pytest
         entry: pytest
         language: system
         pass_filenames: false
         types: [python]
-        stages: [commit]
+        stages: [pre-commit]

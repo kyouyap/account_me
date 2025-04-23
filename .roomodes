@@ -1,0 +1,59 @@
+{
+  "customModes": [
+    {
+      "name": "Python:Module",
+      "groups": [
+        "read",
+        "edit",
+        "browser",
+        "command",
+        "mcp"
+      ],
+      "source": "project",
+      "slug": "python-tdd",
+      "roleDefinition": "\n## 実装モード: モジュールモード\n\n本モジュールは、複数ファイルで構成されるパッケージにおいて、内部実装と公開 API を明確に分離することを目的とします。Python の設計思想に則り、依存関係は必要な箇所で直接インポートし、シンプルかつ明示的な構造により可読性とメンテナンス性を向上させます。\n\n### 例: ディレクトリ構成\n\n```\nxxx/                     # パッケージ xxx\n  __init__.py           # 公開 API を定義。必要なクラス・関数のみを再エクスポート。\n  core.py               # 中核となる実装コード。必要に応じた型定義や定数も内包。\n  utils.py              # 内部処理を支える補助関数群を実装。\ntests/                   # テストコードの集約ディレクトリ\n  test_core.py          # core.py の機能に対するテスト\n  test_utils.py         # utils.py の機能に対するテスト\n```\n\n### 各ファイルの役割\n\n- **`__init__.py`:**  \n  - パッケージのパブリック API を明示的に定義します。  \n  - 内部実装（`core.py` や `utils.py`）から公開すべきシンボルのみをインポートし、`__all__` に登録します。  \n  - これにより、他モジュールは必ずこのファイル経由で機能へアクセスし、内部構造の詳細は隠蔽されます。\n\n- **`core.py`:**  \n  - パッケージの主要な実装コードを担当します。  \n  - 外部依存ライブラリはファイル内で直接インポートし、必要に応じて PEP 484 に基づく型ヒントを使用します。  \n  - 複雑な型定義や定数は、このファイル内にまとめるか、必要であれば小規模なサブモジュールに分割します。\n\n- **`utils.py`:**  \n  - `core.py` を補完する補助関数や内部処理機能を実装します。  \n  - 単一責任の原則に従い、関連する機能をシンプルなユーティリティとして提供します。\n\n- **テストファイル (`tests/` 以下):**  \n  - 各実装ファイルに対応するテストコードを、パッケージルートから独立して管理します。  \n  - テストは `pytest` を活用し、機能ごとに分割されたテストファイルを用いることで、効率的なデバッグとリファクタリングを実現します。  \n  - 例:\n    ```bash\n    pytest --maxfail=1 --disable-warnings -q\n    ```\n\n### テストの実行とデバッグ\n\n- **モジュール全体のテスト実行例:**\n  ```bash\n  pytest --maxfail=1 --disable-warnings -q\n  ```\n- **特定のテストファイル実行例:**\n  ```bash\n  pytest tests/test_core.py\n  ```\n- **テスト失敗時の対処手順:**\n  1. 全体テストの実行で問題箇所を特定する。  \n  2. 該当テストファイルを個別に実行し、段階的に原因を特定（例: プリントデバッグを併用）する。  \n  3. 修正後、再度全体テストを実行して動作を確認する。\n\n### 依存管理と外部参照\n\n- 外部ライブラリは `pip`、`poetry`、`pyproject.toml`、または `requirements.txt` で管理します。  \n- 他パッケージや外部ライブラリへの参照は、絶対インポートまたは明示的な相対インポートを使用し、内部実装の変更が外部へ影響しない設計とします。  \n- 例：  \n  - **OK:**  \n    ```python\n    from requests import get\n    ```\n  - **NG:**  \n    ```python\n    from some_internal_path.requests import get\n    ```\n\nこのような設計により、モジュール間の依存関係が明確になり、リファクタリングやコードメンテナンスが容易になります。Python の哲学に基づいたシンプルで明示的な構造は、長期的なプロジェクトの品質向上に寄与します。\n",
+      "__filename": "/Users/ogatatakuya/Documents/202504/account_me/.cline/roomodes/python-tdd.md"
+    },
+    {
+      "name": "Python:Module",
+      "groups": [
+        "read",
+        "edit",
+        "browser",
+        "command",
+        "mcp"
+      ],
+      "source": "project",
+      "slug": "python-module",
+      "roleDefinition": "\n## 実装モード: モジュールモード\n\nモジュールモードでは、複数のファイルで構成されたパッケージを対象とし、内部実装と公開インターフェースを明確に分離します。以下の例は、ディレクトリ構成と各ファイルの役割について説明しています。\n\n### 例: ディレクトリ構成\n\n```\nxxx/                     # モジュール xxx パッケージ\n  __init__.py           # 公開インターフェース。lib.py からの関数やクラスの再エクスポートのみを行う。\n  deps.py               # 他の外部モジュールのインポートを集約し、内部で使用する機能を re-export する。\n  lib.py                # 実装コード。deps.py から import したものを利用して実装を行う。\n  types.py              # 型定義や定数など、モジュール内で使用する型情報を集約する。\n  test_module.py        # __init__.py の公開インターフェースに対するテストコード。\n  test_lib.py           # lib.py の実装に対するテストコード。\nyyy/                     # 別モジュール yyy も同様の構成\n  __init__.py\n  deps.py\n  lib.py\n  types.py\n  test_module.py\n  test_lib.py\n```\n\n### 各ファイルの役割\n\n- **`__init__.py`:**  \n  - モジュールのパブリックインターフェースを定義します。  \n  - 内部実装（lib.py）の詳細は隠蔽し、必要な関数やクラスだけを再エクスポートします。  \n  - 他モジュールは必ずこのファイル経由で参照し、直接 lib.py など内部ファイルを import してはいけません。\n\n- **`deps.py`:**  \n  - 外部依存関係（例: requests, numpy など）のインポートをまとめ、モジュール内で共通利用できるように再エクスポートします。  \n  - このファイルを見るだけで、モジュールが依存している外部ライブラリを把握できます。\n\n- **`types.py`:**  \n  - モジュール内で使用する型定義（PEP 484 に基づく型ヒントや NamedTuple、dataclass など）を集約します。  \n  - 複雑な型定義はここで管理し、他ファイルからも参照できるようにします。\n\n- **`lib.py`:**  \n  - モジュールの実装コードを担当します。  \n  - 内部では必ず deps.py からインポートした依存関係を使用し、外部からの直接参照はさせません。  \n  - コード量が少ない場合はこのファイル内で実装してもよいですが、実装量が多い場合は適宜複数ファイルに分割します。\n\n- **テストファイル (`test_module.py`, `test_lib.py`):**  \n  - 各実装ファイルに対して、1:1 で対応するテストコードを作成します。  \n  - テストは、パッケージルートまたは同一ディレクトリに配置し、`pytest` コマンドで実行します。  \n  - 例:  \n    ```bash\n    pytest xxx/test_module.py\n    ```\n\n### テストの実行とデバッグ\n\n- モジュール全体のテストは、例えば以下のように実行します：\n  ```bash\n  pytest --maxfail=1 --disable-warnings -q\n  ```\n- 特定のテストファイルだけ実行する場合：\n  ```bash\n  pytest xxx/test_lib.py\n  ```\n- テストが落ちた場合は、落ちたテストの内容を確認し、次の手順で進めます：\n  1. 全体テストを実行して、問題の箇所を特定する。\n  2. 問題のテストファイルのみ実行し、失敗原因をステップバイステップで検証する（プリントデバッグなどを併用）。\n  3. 必要ならば、修正後に再度モジュール全体のテストを確認する。\n\n### 依存管理と外部参照\n\n- Python 版モジュールでは、外部ライブラリは `uv add ` によって管理され、依存関係は `pyproject.toml` や `requirements.txt` に記述します。  \n- 他のモジュールや外部ライブラリを参照する際は、直接ファイルを指定するのではなく、パッケージ管理ツール（uv や pip）を通じて管理し、`__init__.py` 経由で公開することを推奨します。  \n- 例：  \n  - **OK:**  \n    ```python\n    from requests import get\n    ```\n  - **NG:**  \n    ```python\n    from some_internal_path.requests import get\n    ```\n\nこのような構造により、モジュール間の依存関係が明確になり、変更影響範囲が予測しやすく、リファクタリングもしやすくなります。\n\n",
+      "__filename": "/Users/ogatatakuya/Documents/202504/account_me/.cline/roomodes/python-module.md"
+    },
+    {
+      "name": "Deno:Refactor",
+      "groups": [
+        "read",
+        "edit",
+        "browser",
+        "command",
+        "mcp"
+      ],
+      "source": "project",
+      "slug": "python-refactor",
+      "roleDefinition": "\n## リファクターモード\n\nWIP\n",
+      "__filename": "/Users/ogatatakuya/Documents/202504/account_me/.cline/roomodes/python-refactor.md"
+    },
+    {
+      "name": "uv-script Python",
+      "groups": [
+        "read",
+        "edit",
+        "command",
+        "mcp"
+      ],
+      "source": "project",
+      "slug": "uv-script",
+      "roleDefinition": "\n## 実装モード: スクリプトモード\n\n- 外部依存を可能な限り減らし、一つのファイル内に全ての処理（実装＋テスト）を完結させる。\n- テストコードも同じファイルに記述する。\n- スクリプトモードは、ファイル冒頭に `# @script` というコメントが含まれている場合、または `scripts/` や `script/` 以下のファイルが対象となる。\n\nスクリプトモードの例\n\n```python\n# @script\n\"\"\"\n足し算を行うモジュール\n\"\"\"\n\ndef add(a: int, b: int) -> int:\n  return a + b\n\n# メイン実行部：直接実行時のエントリーポイント\nif __name__ == \"__main__\":\n  print(add(1, 2))\n\n# --- テストコード ---\nimport pytest\n\ndef test_add():\n  assert add(1, 2) == 3, \"1 + 2 は 3 であるべき\"\n\n# 'test' 引数を付与して実行するとテストが動作するようにする（例: python script.py test）\nif __name__ == \"__main__\" and 'test' in sys.argv:\n  pytest.main()\n```\n\nCLINE/Roo のようなコーディングエージェントは、まず `python script.py` で実行して動作確認を行い、要求に応じてテストコードを充実させ、後に必要に応じてモジュールモードに移行していきます。\n\n### 依存関係について\n\n- スクリプトモードでは、曖昧な import（たとえば標準ライブラリ以外のライブラリの利用）は許容されるものの、可能な限り安定したバージョンを利用してください。  \n- 具体的には、必要な外部ライブラリは事前に `requirements.txt` や `pyproject.toml` で管理し、pip などでインストール済みであることを前提とします。\n\n**優先順の例**\n\n- 可能であれば、特定バージョンのライブラリは管理ファイル（pyproject.toml など）で固定する  \n- 標準ライブラリを優先する  \n- 外部ライブラリの利用は必要最小限に留める\n\n```python\n# OKな例\nimport requests  # pip install requests でインストール済み\n\n```\n\n最初はスクリプトモードで検証を行い、必要に応じてモジュールモード（複数ファイル構成）に移行してください。\n\n\n",
+      "__filename": "/Users/ogatatakuya/Documents/202504/account_me/.cline/roomodes/uv-script.md"
+    }
+  ]
+}
