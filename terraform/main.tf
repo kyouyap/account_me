@@ -16,13 +16,17 @@ resource "google_project_service" "apis" {
   disable_on_destroy         = false
 }
 
-# サービスアカウント
-resource "google_service_account" "sa" {
-  account_id   = "${var.service_name}-sa"
-  display_name = "MoneyForward ETL Pipeline Service Account"
+# Spreadsheet用サービスアカウント
+resource "google_service_account" "spreadsheet" {
+  account_id   = "spreadsheet-sa"
+  display_name = "Spreadsheet Service Account"
 }
 
-resource "google_project_iam_member" "sa_roles" {
+resource "google_service_account_key" "spreadsheet" {
+  service_account_id = google_service_account.spreadsheet.name
+}
+
+resource "google_project_iam_member" "spreadsheet_roles" {
   for_each = toset([
     "roles/storage.objectCreator",
     "roles/bigquery.dataEditor",
@@ -30,7 +34,19 @@ resource "google_project_iam_member" "sa_roles" {
   ])
   project = var.project_id
   role    = each.value
-  member  = "serviceAccount:${google_service_account.sa.email}"
+  member  = "serviceAccount:${google_service_account.spreadsheet.email}"
+}
+
+# Gmail OAuthクライアント認証情報（手動発行）
+# Google Cloud ConsoleでOAuthクライアントID/シークレットを発行し、そのJSONをSecret Managerに格納します。
+resource "google_secret_manager_secret" "gmail_credentials" {
+  secret_id = "gmail-api-credentials"
+  replication { auto {} }
+  depends_on = [google_project_service.apis]
+}
+resource "google_secret_manager_secret_version" "gmail_credentials" {
+  secret      = google_secret_manager_secret.gmail_credentials.id
+  secret_data = file(var.gmail_credentials_file)
 }
 
 # Secret Manager
@@ -101,9 +117,22 @@ resource "google_secret_manager_secret" "gmail_credentials" {
 
 resource "google_secret_manager_secret_version" "gmail_credentials" {
   secret      = google_secret_manager_secret.gmail_credentials.id
-  # 外部ファイルから認証情報を読み込む
-  # 従来のJSON文字列変数が空でない場合はそちらを優先（後方互換性のため）
-  secret_data = var.gmail_credentials_json != "" ? var.gmail_credentials_json : file(var.gmail_credentials_file)
+  # Gmail用サービスアカウントの鍵をSecret Managerに格納
+  secret_data = base64decode(google_service_account_key.gmail.private_key)
+}
+
+# Spreadsheet Credential Secret
+resource "google_secret_manager_secret" "spreadsheet_credential" {
+  secret_id = "spreadsheet-credential"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "spreadsheet_credential" {
+  secret      = google_secret_manager_secret.spreadsheet_credential.id
+  secret_data = base64decode(google_service_account_key.spreadsheet.private_key)
 }
 
 # Gmail API トークン

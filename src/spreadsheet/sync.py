@@ -39,9 +39,8 @@ class SpreadsheetSync:
                     "https://spreadsheets.google.com/feeds",
                     "https://www.googleapis.com/auth/drive",
                 ]
-                credentials = ServiceAccountCredentials.from_json_keyfile_name(
-                    settings.paths.credentials, scope
-                )
+                credentials_info = json.loads(os.getenv("SPREADSHEET_CREDENTIAL_JSON"))
+                credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
                 self._client = gspread.authorize(credentials)
             except Exception as e:
                 raise SpreadsheetError(

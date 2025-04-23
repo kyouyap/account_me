@@ -73,6 +73,7 @@ def get_secrets() -> None:
             "SPREADSHEET_KEY": "spreadsheet-key",
             "GMAIL_CREDENTIALS": "gmail-api-credentials",
             "GMAIL_API_TOKEN": "gmail-api-token",
+            "SPREADSHEET_CREDENTIAL_JSON": "spreadsheet-credential",
         }
 
         for env_var, secret_name in secrets.items():

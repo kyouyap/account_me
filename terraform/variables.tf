@@ -34,7 +34,7 @@ variable "spreadsheet_key" {
 }
 
 variable "gmail_credentials_file" {
-  description = "Gmail API認証情報のJSONファイルへのパス"
+  description = "Gmail OAuthクライアントID/シークレット（Google Cloud Consoleで手動発行したJSONファイル）のパス"
   type        = string
 }
 

@@ -62,4 +62,3 @@ paths:
       detail: "/app/outputs/aggregated_files/detail"
       assets: "/app/outputs/aggregated_files/assets"
   downloads: "/app/downloads"
-  credentials: "/app/credentials/spread_sheet_credential.json"
