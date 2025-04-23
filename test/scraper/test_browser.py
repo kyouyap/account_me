@@ -48,11 +48,11 @@ def mock_browser_setup(browser_manager, mock_gmail_client, mock_form_elements):
     mock_driver.page_source = "mock page source"
     elements = mock_form_elements
 
-    with patch(
-        "scraper.browser.GmailClient", return_value=mock_gmail_client
-    ), patch.object(browser_manager, "driver", mock_driver), patch(
-        "builtins.open", mock_open()
-    ) as mock_file:
+    with (
+        patch("scraper.browser.GmailClient", return_value=mock_gmail_client),
+        patch.object(browser_manager, "driver", mock_driver),
+        patch("builtins.open", mock_open()) as mock_file,
+    ):
         yield {
             "driver": mock_driver,
             "gmail": mock_gmail_client,
@@ -78,9 +78,11 @@ def test_init(browser_manager):
 
 def test_context_manager(browser_manager):
     """コンテキストマネージャーのテスト。"""
-    with patch("selenium.webdriver.Chrome") as mock_chrome, patch(
-        "selenium.webdriver.chrome.service.Service"
-    ), patch("os.path.exists", return_value=True):
+    with (
+        patch("selenium.webdriver.Chrome") as mock_chrome,
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("os.path.exists", return_value=True),
+    ):
         mock_driver = MagicMock()
         mock_driver.page_source = "mock page source"
         mock_chrome.return_value = mock_driver
@@ -96,9 +98,11 @@ def test_context_manager(browser_manager):
 
 def test_setup_driver_success(browser_manager):
     """WebDriver設定の成功テスト。"""
-    with patch("selenium.webdriver.Chrome") as mock_chrome, patch(
-        "selenium.webdriver.chrome.service.Service"
-    ), patch("os.path.exists", return_value=True):
+    with (
+        patch("selenium.webdriver.Chrome") as mock_chrome,
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("os.path.exists", return_value=True),
+    ):
         mock_driver = MagicMock()
         mock_chrome.return_value = mock_driver
 
@@ -187,9 +191,10 @@ def test_get_links_for_download_with_element_error(browser_manager):
     )
     mock_accounts_table.find_element.return_value = mock_table
 
-    with patch.object(browser_manager, "driver", mock_driver), patch.object(
-        browser_manager, "wait_and_find_element"
-    ) as mock_find:
+    with (
+        patch.object(browser_manager, "driver", mock_driver),
+        patch.object(browser_manager, "wait_and_find_element") as mock_find,
+    ):
         mock_find.return_value = mock_accounts_table
         with pytest.raises(ScrapingError) as exc_info:
             # URLを/accountsに変更
@@ -358,8 +363,9 @@ def test_login_failure(browser_manager, mock_browser_setup):
     mock_setup = mock_browser_setup
     mock_setup["driver"].page_source = "mock page source"
 
-    with patch.object(browser_manager, "wait_and_find_element") as mock_find, patch(
-        "builtins.open", mock_open()
+    with (
+        patch.object(browser_manager, "wait_and_find_element") as mock_find,
+        patch("builtins.open", mock_open()),
     ):
         mock_find.side_effect = TimeoutException("タイムアウト")
 
