@@ -146,7 +146,7 @@ class BrowserManager:
             raise ScrapingError(f"ブラウザの設定中に予期せぬエラーが発生: {e}") from e
 
     def wait_and_find_element(
-        self, by: By, value: str, timeout: Optional[int] = None
+        self, by: By | str, value: str, timeout: Optional[int] = None
     ) -> WebElement:
         """要素が見つかるまで待機して取得。
 
