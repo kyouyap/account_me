@@ -34,7 +34,7 @@ repos:
 
       - id: pytest
         name: Run pytest
-        entry: pytest
+        entry: pytest -n auto
         language: system
         pass_filenames: false
         types: [python]

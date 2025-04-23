@@ -62,4 +62,5 @@ dev-dependencies = [
     "types-aiofiles>=24.1.0.20241221",
     "pytest-asyncio>=0.25.3",
     "requests-mock>=1.12.1",
+    "pytest-xdist>=3.6.1",
 ]

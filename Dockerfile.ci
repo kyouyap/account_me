@@ -22,4 +22,4 @@ COPY . /opt
 # Synchronize uv if required
 RUN uv sync
 
-CMD [ "uv", "run", "pytest", "-s" ]
+CMD [ "uv", "run", "pytest", "-n", "auto", "-s" ]
