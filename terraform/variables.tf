@@ -44,3 +44,10 @@ variable "gmail_credentials_json" {
   sensitive   = true
   default     = ""
 }
+
+variable "gmail_token_json" {
+  description = "Gmail APIトークンのJSON（初期値）"
+  type        = string
+  sensitive   = true
+  default     = "{}"
+}

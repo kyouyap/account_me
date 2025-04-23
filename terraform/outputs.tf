@@ -1,5 +1,5 @@
 output "service_account_email" {
-  value = google_service_account.sa.email
+  value = google_service_account.spreadsheet.email
 }
 
 output "storage_bucket" {
