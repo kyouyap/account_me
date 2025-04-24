@@ -9,8 +9,10 @@
   - `main.py`: プロジェクトのエントリーポイント
   - `scraper/`: スクレイピング関連のモジュール
   - `spreadsheet/`: スプレッドシート同期関連のモジュール
-- `config/`: 設定ファイル
-- `test/`: テストコード
+  - `exceptions/`: 独自例外定義
+  - `config/`: 設定・認証情報・ロギング関連
+- `config/`: 設定ファイル（YAML等）
+- `test/`: テストコード（config, detail, scraper等のサブディレクトリ含む）
 - `outputs/`: 出力データ
 
 ## スクリプトの説明
@@ -39,71 +41,158 @@
 
 ## セットアップ手順
 
-### WSLとDockerのセットアップ
-1. Windows上でWSLを有効化し、Ubuntuをインストール
-2. WSL上にDockerをインストールし、必要な設定を行う
+---
 
-### プロジェクト構成の準備
-1. 開発環境としてVSCodeのdevcontainer機能を利用し、プロジェクトのベースを作成
-2. 必要なディレクトリ構造を設定し、DockerのComposeファイルを作成
+### セットアップ全体の流れ（概要）
 
-### 環境変数の準備
-1. `src` 配下に `.env` ファイルを作成し、以下のような内容で環境変数を設定
-    ```env
-    EMAIL="example@gmail.com"
-    PASSWORD="example"
-    SPREADSHEET_KEY="hogehoge"
-    ```
-2. GCPの認証キーのパスも設定ファイル（例：`config/settings.yaml`）や環境変数に記述する
+1. 前提条件の準備（WSL/Docker/Terraform/VSCode）
+2. GCPプロジェクト作成・API有効化
+3. Gmail OAuth認証情報の発行
+4. terraform.tfvarsの作成
+5. Terraformでクラウドリソース構築
+6. Dockerイメージのビルド・起動
+7. 初回OAuth認証（src/scraper/gmail_client.pyで自動実行）
+8. 定期実行タスクの設定
+
+---
+
+### Step-by-Stepセットアップガイド
+
+#### Step 1: 前提条件の準備
+
+- Windows 10/11 + WSL2（Ubuntu推奨）
+- Docker Desktop（WSL2連携有効化）
+- Google Cloud SDK（gcloudコマンド）
+- Terraform
+- VSCode（Remote - WSL拡張推奨）
+- GCPアカウント
+
+#### Step 2: GCPプロジェクト作成・API有効化
+
+1. [Google Cloud Console](https://console.cloud.google.com/)で新規プロジェクトを作成
+2. 以下のAPIを有効化
+   - Secret Manager API
+   - Gmail API
+   - Google Sheets API
+   - BigQuery API
+   - Cloud Storage API
+
+#### Step 3: Gmail OAuth認証情報の発行
+
+1. Google Cloud Consoleで「APIとサービス」→「認証情報」→「認証情報を作成」→「OAuthクライアントID」
+2. アプリケーションの種類は「デスクトップアプリ」
+3. 作成後、JSONファイルをダウンロード
+4. 詳細手順は`docs/gmail_api_setup.md`参照
+
+#### Step 4: terraform.tfvarsの作成
+
+`terraform/terraform.tfvars`を以下の例のように作成
+
+```hcl
+project_id  = "your-project-id"                # GCPプロジェクトID
+region      = "asia-northeast1"                # 利用するGCPリージョン
+mf_email    = "your-email@example.com"         # MoneyForwardログイン用メールアドレス
+mf_password = "your-password"                  # MoneyForwardログイン用パスワード
+spreadsheet_key = "your-spreadsheet-key"       # Googleスプレッドシートのキー
+gmail_credentials_file = "./credentials/gmail_oauth_client.json"  # Gmail OAuthクライアント認証情報（手動発行したJSONファイルのパス）
+```
+
+- `gmail_credentials_file`には、Step 3でダウンロードしたJSONファイルのパスを指定
+- 追加変数が必要な場合は`terraform/variables.tf`も参照
+
+#### Step 5: Terraformでクラウドリソース構築
+
+```sh
+cd terraform
+terraform init
+terraform apply
+```
+
+- Secret ManagerやBigQuery、Storageバケット等が自動作成されます
+
+#### Step 6: Dockerイメージのビルド・起動（WSL上で実施）
+
+```sh
+docker-compose build
+docker-compose up -d
+```
+
+- WSL2上でDocker Desktopが連携されていることを確認
+- **初回認証は以下のコマンドで一時的なコンテナを起動し、OAuth認証を完了させる**
+  ```sh
+  docker-compose run --rm app python /app/src/main.py
+  ```
+  （`--rm`で認証後にコンテナが自動削除されます）
+
+#### Step 7: 初回OAuth認証フロー
+
+- 初回実行時、`src/scraper/gmail_client.py`経由でブラウザ認証が必要
+- 認証後、トークンがSecret Managerに保存される
+- 以降は自動で認証情報が利用される
+
+#### Step 8: 定期実行タスクの設定
+
+- cron等で定期的に`docker exec`で`python /app/src/main.py`を実行
+- 例（WSLのcrontabで12時間ごとに実行）:
+  ```
+  0 */12 * * * docker exec <container名> python /app/src/main.py
+  ```
+
+---
 
 ### スプレッドシートの準備
+
 - MoneyForwardの可視化テンプレートを基に、自分用にカスタマイズしたスプレッドシートを作成
   参考用スプレッドシート:
   [https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0](https://docs.google.com/spreadsheets/d/1NQOaC2-R-Jfdc0FGjcVpbspu4R5ahDQsXTrKRHe1Arg/edit?gid=0)
 
-### GCP認証情報の自動生成・管理手順（Terraformベース最新構成）
+#### 1. 必要なファイル・記載内容
 
-このプロジェクトでは、Google Sheets用・Gmail用で用途ごとにサービスアカウントを分けて作成し、それぞれの認証情報（JSON鍵）はTerraformで自動生成・Google Secret Managerに安全に格納します。手動でJSONファイルをダウンロード・配置する必要はありません。
+- `terraform/main.tf` には以下のような内容を記載します（例）:
+    - 必要なAPIの有効化（Secret Manager, Gmail, Sheets, BigQuery, Storage等）
+    - Spreadsheet用サービスアカウントの作成と鍵のSecret Manager格納
+    - MoneyForward認証情報・スプレッドシートキー・Gmail認証情報等のSecret Manager格納
+    - BigQueryやStorageバケット等のリソース作成
 
-#### 1. 必要なAPIの有効化
-- Google Cloud Consoleでプロジェクトを選択し、以下のAPIを有効化してください：
-  - Google Sheets API
-  - Gmail API
-  - Secret Manager API
-  - BigQuery API
-  - Cloud Storage API
+- `terraform/variables.tf` には各種変数（プロジェクトID、認証情報、リージョン等）を定義します。
 
-#### 2. 認証情報の準備・管理方針
-- **Spreadsheet用**：サービスアカウントをTerraformで自動生成し、その鍵情報（JSON）をSecret Managerに自動格納します。
-- **Gmail用**：OAuthクライアントID/シークレット（ユーザー認可型認証情報）はGoogle Cloud Consoleから手動で発行し、そのJSONをTerraformでSecret Managerに格納します。
-  - ※GmailのOAuthクライアントID/シークレットは現状Terraform等での自動発行はできません。Google Cloud Consoleの「認証情報」画面から手動で取得してください。
+- `terraform/terraform.tfvars` で各変数の値を指定します。
 
-#### 3. デプロイ手順
-1. 必要な変数（特に `gmail_credentials_file` には手動発行したOAuthクライアントJSONのパス）を `terraform/terraform.tfvars` で設定
-2. 以下のコマンドでTerraformを実行し、インフラと認証情報を構築します：
-   ```sh
-   cd terraform
-   terraform init
-   terraform apply
-   ```
-3. 実行後、Google Secret Managerに以下のようなシークレットが作成されます：
-   - `spreadsheet-credential` : Spreadsheet用サービスアカウントの認証情報
-   - `gmail-api-credentials` : Gmail用OAuthクライアント認証情報
+##### terraform/terraform.tfvars のセットアップ例
 
-#### 4. アプリケーションからの認証情報取得
-- Pythonアプリ等からは、Secret Manager経由で認証情報を取得し、環境変数や設定で利用します。
-- `.env`や`config/settings.yaml`でファイルパスを指定する必要はありません。
-- 例：
-  - `SPREADSHEET_CREDENTIAL_JSON` 環境変数にSecret Managerから取得したJSONを格納
-  - `GMAIL_CREDENTIALS` も同様
+```hcl
+project_id  = "your-project-id"                # GCPプロジェクトID
+region      = "asia-northeast1"                # 利用するGCPリージョン
+mf_email    = "your-email@example.com"         # MoneyForwardログイン用メールアドレス
+mf_password = "your-password"                  # MoneyForwardログイン用パスワード
+spreadsheet_key = "your-spreadsheet-key"       # Googleスプレッドシートのキー
+gmail_credentials_file = "./credentials/gmail_oauth_client.json"  # Gmail OAuthクライアント認証情報（Google Cloud Consoleで手動発行したJSONファイルのパス）
+```
 
-#### 5. 注意事項
-- Gmail APIのOAuthクライアントID/シークレットは手動発行が必要ですが、一度Secret Managerに格納すれば以降は自動的に安全に運用できます。
-- サービスアカウント型はGmail APIの一部機能に非対応のため、ユーザー認可型（OAuthクライアント）を利用しています。
+- `gmail_credentials_file`には、docs/gmail_api_setup.mdの手順でダウンロードしたJSONファイルのパスを指定してください。
+- 追加で必要な変数がある場合は、`terraform/variables.tf`を参照してください。
+
+#### 2. クラウドインフラの立ち上げ手順
+
+1. GCPプロジェクトを作成し、サービスアカウントに必要な権限を付与
+2. `terraform` ディレクトリで以下を実行
+    ```sh
+    cd terraform
+    terraform init
+    terraform apply
+    ```
+3. 実行後、Secret ManagerやBigQuery、Storageバケット等が自動で作成されます
+
+#### 3. Gmail認証情報の登録
+
+- Gmail API用OAuth認証情報のみ手動発行が必要です。手順は`docs/gmail_api_setup.md`を参照し、`terraform.tfvars`にJSONを貼り付けてください。
+
+#### 4. 補足
+
+- 認証情報やアプリケーション設定は、Secret Managerからアプリケーションが自動取得します。.envやconfig/settings.yamlでファイルパスを指定する必要はありません。
+- Spreadsheet用サービスアカウントと認証情報は**Terraformで自動生成・Secret Managerに格納**されるため、手動作成は不要です。
 
 ---
-
-これにより、認証情報の手動管理・配置ミスのリスクがなくなり、安全かつ自動的にインフラ・認証基盤が整います。
 
 ### 実装とテスト
 1. Seleniumを利用したMoneyForwardからのデータ取得処理を実装
@@ -111,11 +200,8 @@
 3. ローカル環境での手動テストを行い、動作確認
 
 ### 定期実行の設定
-- Cronジョブを使用して、定期的にデータ取得からスプレッドシートの更新までを自動化
-- `docker-compose up -d`で実行し、crontabで以下のようなコマンドを設定（例）：
-    ```cron
-    * */12 * * * /usr/bin/docker exec uv-for-seleniarm python /app/src/main.py
-    ```
+- Cronジョブ等で、定期的にデータ取得からスプレッドシートの更新までを自動化できます。
+- `docker-compose up -d`でコンテナを起動し、必要に応じて`docker exec`で`python /app/src/main.py`を実行してください。
 
 ## ダッシュボードの利用
 - Googleスプレッドシートに集約されたデータを基に、家計の現状や傾向を視覚的に分析
@@ -136,7 +222,5 @@
   - ワークシート名（例：`@家計簿データ 貼付` や `@資産推移 貼付`）、開始行、各列の定義は、利用するスプレッドシートの構成に合わせて編集が必要です。
 
 - **paths**:
-  - 出力先ディレクトリ、ダウンロードディレクトリ、認証情報ファイルのパスは、実際のシステム構成に合わせて確認・変更してください。
-
-> ※ 本手順では、Python 3.12およびmypy/pylint等の静的解析ツールを用いて、変数名やコメント、ガード句の使用などGoogleのエンジニアとしてのベストプラクティスに従った設計を意識しています。
-
+  - 出力先ディレクトリ、ダウンロードディレクトリ等は、実際のシステム構成に合わせて確認・変更してください。
+  - 認証情報ファイルのパス指定は不要です（Secret Managerから自動取得）。
