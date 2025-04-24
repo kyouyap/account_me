@@ -1,218 +1,268 @@
-# Python のコーディングベストプラクティス
-
-## 方針
-
-- **最初に型とインターフェース（関数のシグネチャ）を考える**  
-  Python では、PEP 484 に基づく型ヒントや `typing.NewType`、`Protocol` を活用して、処理対象の型と関数のシグネチャを設計します。
-
-- **ファイル冒頭のコメントで仕様を明記する**  
-  各ファイルの冒頭に、そのファイルでどのような仕様を実現するかを docstring やコメントとして記述します。
-
-- **内部状態を持たない場合は関数を優先する**  
-  状態が不要な場合は、クラスよりも純粋関数を作成し、テストや再利用がしやすい設計を心がけます。
-
-- **副作用はアダプタパターンで抽象化し、テスト時はインメモリな実装で差し替える**  
-  外部依存（IO、DB、外部 API など）はアダプタパターンを用いて抽象化し、テスト時にはモックやスタブに置き換えます。
+# Python のベストプラクティス
 
 ---
 
-## 型の使用方針
+## 目次
 
-1. **具体的な型を使用する**  
-   - Python では `Any` の使用は最小限にとどめ、必要に応じて `Union` や `Optional` で型を絞り込みます。
-   - 標準ライブラリの `typing` モジュールや `typing_extensions` の Utility Types を活用します。
-
-2. **型エイリアスの命名**  
-   - 意味のある名前を付け、型の意図を明確にします。  
-   - 例:
-     ```python
-     from typing import NewType
-     
-     UserId = NewType("UserId", str)
-     
-     # 良い例
-     class UserData:
-         def __init__(self, id: UserId, created_at: str):
-             self.id = id
-             self.created_at = created_at
-     
-     # 悪い例（any の使用）
-     Data = object
-     ```
+1. 全体方針  
+2. 実装の選択基準  
+3. コードスタイル & フォーマッタ  
+4. 型ヒント & 静的解析  
+5. Docstring 規約（Google Style）  
+6. モジュール / パッケージ構成  
+7. 依存性の注入（DI）  
+8. エラー処理 & 例外設計  
+9. ロギング  
+10. テスト指針  
+11. デザインパターン実装例  
+12. 非同期 & 並行処理  
+13. パフォーマンス最適化  
+14. セキュリティ / 安全なコード  
+15. 参考資料
 
 ---
 
-## エラー処理
+## 1. 全体方針
 
-### 1. Result 型の使用
-
-Python では、成功と失敗を表すために自作の `Result` クラスを用いることがあります。例えば：
-
-```python
-from typing import Generic, TypeVar, Union
-
-T = TypeVar("T")
-E = TypeVar("E")
-
-class Result(Generic[T, E]):
-    def __init__(self, ok: bool, value: Union[T, None] = None, error: Union[E, None] = None):
-        self.ok = ok
-        self.value = value
-        self.error = error
-
-    def is_ok(self) -> bool:
-        return self.ok
-
-    def is_err(self) -> bool:
-        return not self.ok
-
-def ok(value: T) -> Result[T, E]:
-    return Result(True, value=value)
-
-def err(error: E) -> Result[T, E]:
-    return Result(False, error=error)
-```
-
-エラー型も、具体的なケースを列挙し、エラーメッセージを含めた実装にします。
-
-### 2. エラー処理の例
-
-```python
-import requests
-from typing import Any
-
-class ApiError(Exception):
-    pass
-
-class NetworkError(ApiError):
-    pass
-
-class NotFoundError(ApiError):
-    pass
-
-class UnauthorizedError(ApiError):
-    pass
-
-async def fetch_user(user_id: str) -> Result[Any, ApiError]:
-    try:
-        response = requests.get(f"https://api.example.com/users/{user_id}")
-        if not response.ok:
-            if response.status_code == 404:
-                return err(NotFoundError("User not found"))
-            elif response.status_code == 401:
-                return err(UnauthorizedError("Unauthorized"))
-            else:
-                return err(NetworkError(f"HTTP error: {response.status_code}"))
-        return ok(response.json())
-    except Exception as error:
-        return err(NetworkError(str(error) if isinstance(error, Exception) else "Unknown error"))
-```
+| 目的 | 具体策 |
+|------|--------|
+| **読みやすさ最優先** | *Self-Documenting Code* を目指す。意味のある変数名・関数名、重複排除（DRY）。 |
+| **自動整形の徹底** | `black`, `ruff`, `isort` を CI で強制。人間同士のスタイル議論をゼロにする。 |
+| **型安全** | 100 %型ヒント＋`mypy --strict`。曖昧さを排除し、保守コストを下げる。 |
+| **小さく作り、大きく育てる** | 小さい PR・小さい関数でフィードバックループを短縮。 |
+| **実行環境の統一** | `pyproject.toml` でバージョン固定。Docker / dev container 推奨。 |
 
 ---
 
-## 実装パターン
+## 2. 実装の選択基準
 
-### 1. 関数ベース（状態を持たない場合）
+> JavaScript 規約のテイストを踏襲したシンプルさで整理📝
 
-```python
-from datetime import datetime
-
-def create_logger():
-    def log(message: str) -> None:
-        print(f"[{datetime.utcnow().isoformat()}] {message}")
-    return log
-```
-
-### 2. クラスベース（状態を持つ場合）
-
-```python
-from typing import Any, Optional
-import time
-
-class TimeBasedCache:
-    def __init__(self, ttl: float):
-        self.ttl = ttl
-        self.items: dict[str, dict[str, Any]] = {}
-
-    def get(self, key: str) -> Optional[Any]:
-        item = self.items.get(key)
-        if item and time.time() < item["expire_at"]:
-            return item["value"]
-        return None
-
-    def set(self, key: str, value: Any) -> None:
-        self.items[key] = {
-            "value": value,
-            "expire_at": time.time() + self.ttl
-        }
-```
-
-### 3. アダプターパターン（外部依存の抽象化）
-
-```python
-from typing import Callable, Dict, TypeVar, Generic
-import requests
-
-T = TypeVar("T")
-
-# Fetcher 型の定義（外部依存の抽象化）
-Fetcher = Callable[[str], Result[T, ApiError]]
-
-def create_fetcher(headers: Dict[str, str]) -> Fetcher:
-    def fetcher(path: str) -> Result[T, ApiError]:
-        try:
-            response = requests.get(path, headers=headers)
-            if not response.ok:
-                return err(NetworkError(f"HTTP error: {response.status_code}"))
-            return ok(response.json())
-        except Exception as error:
-            return err(NetworkError(str(error) if isinstance(error, Exception) else "Unknown error"))
-    return fetcher
-
-class ApiClient:
-    def __init__(self, get_data: Fetcher, base_url: str):
-        self.get_data = get_data
-        self.base_url = base_url
-
-    def get_user(self, user_id: str) -> Result[Any, ApiError]:
-        return self.get_data(f"{self.base_url}/users/{user_id}")
-```
+| 選択肢 | 使う場面 | 主なメリット |
+|--------|---------|-------------|
+| **関数** | - 単純な計算・純粋関数<br>- 内部状態を保持しない | テスト容易、依存最小、読解負荷が低い |
+| **クラス** | - 内部状態を管理したい<br>- リソースのライフサイクルが必要（DBコネクタなど） | 状態と振る舞いをまとめて表現 |
+| **データクラス (`@dataclass`)** | - 不変データレコード<br>- 値オブジェクト | ボイラープレート削減、比較/排序が楽 |
+| **Enum** | - 限定された定数集合 | マジックナンバー排除、型安全 |
+| **Protocol / 抽象基底クラス** | - 実装の交換が前提<br>- テストダブル注入 | DI と相性良し、LSP 準拠 |
+| **Adapter** | - 外部 API / DB / SDK の抽象化 | テスト容易、実装差し替え |
+| **モジュール単位のシングルトン** | - 設定値やログなど一意リソース | グローバル変数より安全 |
+| **スクリプト (`if __name__ == "__main__":`)** | - ワンショット実行ツール | CLI インタフェースを簡易に用意 |
 
 ---
 
-## 実装の選択基準
+## 3. コードスタイル & フォーマッタ
 
-1. **関数を選ぶ場合**
-   - 単純な操作のみ
-   - 内部状態が不要
-   - 依存が少なく、テストが容易
-
-2. **クラスを選ぶ場合**
-   - 内部状態の管理が必要
-   - 設定やリソースの保持、メソッド間での状態共有、ライフサイクル管理が必要
-
-3. **Adapter を選ぶ場合**
-   - 外部依存（API や DB など）の抽象化が必要
-   - テスト時に容易にモックに置き換えられるようにしたい
-   - 実装の詳細を隠蔽し、差し替え可能性を高める
+| ツール | ルール |
+|-------|--------|
+| **black** | 行長 88 桁、--target-version py313 |
+| **ruff** | Pylint, flake8, isort, pep8-naming 等を統合。エラーは CI ブロッカー。 |
+| **pre-commit** | `pre-commit run --all-files` を Git hook に。 |
+| **PEP 8 準拠** | black が自動担保。例外：行長を越える Google style docstring の `Args:` セクションは許可。 |
 
 ---
 
-## 一般的なルール
+## 4. 型ヒント & 静的解析
 
-1. **依存性の注入**
-   - 外部依存はコンストラクタや関数の引数として注入し、グローバルな状態を避ける
-   - テスト時にモックに置き換えられるように設計する
+1. **原則すべての公開 API に型を付与**。  
+2. **`from __future__ import annotations`** を常に先頭に。  
+3. **3.13 の機能**  
+   - PEP 695: `class Box[T]: ...` の新ジェネリック構文  
+   - `Self` 型 & `typing.Sealed`（シールドクラス）  
+4. **型エイリアス宣言**  
+   ```python
+   type JSON = dict[str, "JSON | str | int | bool | None"]  # PEP695
+   ```
+5. **mypy 設定（抜粋）**
+   ```ini
+   [mypy]
+   python_version = 3.13
+   strict = True
+   warn_unused_configs = True
+   ```
 
-2. **インターフェースの設計**
-   - 必要最小限のメソッドを定義し、内部実装の詳細は隠蔽する
-   - プラットフォーム固有の実装に依存しない抽象的なインターフェースを構築する
+---
 
-3. **テスト容易性**
-   - モックの実装を簡潔にし、エッジケースのテストを充実させる
-   - テストヘルパーなどを適切に分離し、テストしやすい構造にする
+## 5. Docstring 規約（Google Style）
 
-4. **コードの分割**
-   - 単一責任の原則 (SRP) に従い、適切な粒度でモジュール化する
-   - 循環参照を避け、モジュール間の依存関係を明確に管理する
+```python
+def fetch_user(user_id: int) -> User:
+    ```python
+        """単一のユーザーオブジェクトを取得します。
+
+        Args:
+            user_id: ユーザーの一意な識別子。
+
+        Returns:
+            User: 取得されたユーザーのドメインモデル。
+
+        Raises:
+            UserNotFoundError: ユーザーが存在しない場合。
+        """
+    ```
+```
+
+- セクション順序: **Summary → Args → Returns → Raises → Examples**  
+- 1行サマリは動詞から。  
+- **例** には `>>>` を使い doctest 可能に。
+
+---
+
+## 6. モジュール / パッケージ構成
+
+```
+project/
+├── src/
+│   ├── app/            # アプリケーションサービス
+│   ├── domain/         # エンティティ & 値オブジェクト
+│   ├── infra/          # DB / API 実装 (Adapter)
+│   ├── presentation/   # CLI / Web Handler
+│   └── settings.py     # Pydantic ベース設定
+├── tests/
+│   └── ...
+├── pyproject.toml
+└── README.md
+```
+
+- **`src/` レイアウト** 推奨。  
+- ドメイン駆動設計 (DDD) に合わせて `domain`, `app`, `infra`, `presentation` を分離。  
+
+---
+
+## 7. 依存性の注入（DI）
+
+| 指針 | 例 |
+|------|----|
+| **コンストラクタインジェクションが第一候補** | ```python class UserService: def __init__(self, repo: UserRepo): ...``` |
+| **ファクトリ / Provider パターンを組み合わせる** | `providers.Factory(UserService)` (dependency-injector ライブラリなど) |
+| **設定 & 環境変数は Pydantic-Settings で吸収** | `settings.db.url` を注入 |
+| **テストでは Stub / Mock 実装に差し替え** | Protocol をキーに DI コンテナでバインド切替 |
+
+---
+
+## 8. エラー処理 & 例外設計
+
+1. **ビジネスエラーは独自例外クラス**（`class DomainError(Exception): ...`）  
+2. **Python 組み込み例外を安易に握りつぶさない**  
+3. **`try / except / else / finally` ブロックをフル活用**  
+4. **例外メッセージはログ・モニタリングで検索可能なキーワードを含める**
+
+---
+
+## 9. ロギング
+
+- `structlog` + 標準 `logging` で JSON 出力。  
+- **ログレベル基準**  
+  - DEBUG: 変数値  
+  - INFO: 正常系ステップ  
+  - WARNING: リトライ可能／軽微エラー  
+  - ERROR: 失敗 (アラート)  
+- **ContextVar** でトレース ID を伝搬。
+
+---
+
+## 10. テスト指針
+
+| 項目 | 推奨 |
+|------|------|
+| **フレームワーク** | `pytest>=8`, `pytest-asyncio` |
+| **AAA パターン** | *Arrange-Act-Assert* を厳守。 |
+| **カバレッジ閾値** | 行 95 % / 分岐 90 % 以上を CI で必須。 |
+| **テストダブル** | `unittest.mock`, `pytest-mock`, `factory-boy` |
+| **フィクスチャ階層** | `conftest.py` をルートに共通化。 |
+
+---
+
+## 11. デザインパターン実装例
+
+> **型ヒント＋Google docstring 付きのミニ実装。**
+
+### 11.1 Strategy
+
+```python
+from collections.abc import Callable
+from typing import Protocol
+
+class DiscountStrategy(Protocol):
+    """Strategy インタフェース。"""
+
+    def __call__(self, price: float) -> float: ...
+
+def no_discount(price: float) -> float:  # 関数も Strategy に
+    return price
+
+def seasonal_discount(price: float) -> float:
+    return price * 0.9
+
+class PriceCalculator:
+    """価格計算クラス (Context)。"""
+
+    def __init__(self, strategy: DiscountStrategy = no_discount) -> None:
+        self._strategy = strategy
+
+    def calc(self, price: float) -> float:
+        """選択された Strategy で価格を算出。"""
+        return self._strategy(price)
+```
+
+### 11.2 Adapter
+
+```python
+class PaymentGateway:
+    """外部 SDK (既存)."""
+    def send(self, payload: dict[str, str]) -> None: ...
+
+class PaymentPort(Protocol):
+    def pay(self, amount: int) -> None: ...
+
+class PaymentAdapter:
+    """SDK をラップし抽象ポートを実装。"""
+
+    def __init__(self, sdk: PaymentGateway) -> None:
+        self._sdk = sdk
+
+    def pay(self, amount: int) -> None:
+        self._sdk.send({"amount": str(amount)})
+```
+
+*Singleton, Factory, Observer, Command* などは付録にコード例を配置（省略）。
+
+---
+
+## 12. 非同期 & 並行処理
+
+1. **`asyncio` を優先しスレッド乱用禁止**  
+2. **I/O バウンド処理** → `asyncio`, CPU バウンド → `concurrent.futures.ProcessPoolExecutor`  
+3. **Cancellation 伝搬** を忘れず `try/except asyncio.CancelledError`  
+4. **非同期コンテキストマネージャ** (`async with`) で接続を安全に管理。
+
+---
+
+## 13. パフォーマンス最適化
+
+| レイヤ | 施策 |
+|-------|-----|
+| **アルゴリズム** | Big-O を意識。辞書・集合を活用する。 |
+| **I/O** | `aiohttp`, `asyncpg` など非同期ライブラリ。 |
+| **データ構造** | `array`, `deque`, `bisect`, `heapq` | 
+| **メモリ** | `slots=True` dataclass、`functools.cache` で重複計算削減。 |
+| **コンパイル** | `python -OO -m py_compile` や Cython / mypyc は最後の手段。 |
+
+---
+
+## 14. セキュリティ / 安全なコード
+
+- **依存ライブラリ脆弱性スキャン**: `pip-audit`, `safety`.  
+- **Secrets 管理**: 環境変数 & Secret Manager、ハードコード禁止。  
+- **入力値バリデーション**: Pydantic v3 の `model_validate`。  
+- **Web 開発**: インジェクション・XSS・CSRF 対策、`werkzeug.security` や OWASP ASVS を参照。  
+- **署名付き型アノテーション** で意図しないミューテーションを防ぐ。
+
+---
+
+### 使い方のヒント
+
+1. 本ドキュメントを **社内 Wiki / README** にそのまま貼り付けても OK。  
+2. プロジェクト固有の規定（命名プリフィックス、CI /CD など）は追記。  
+3. 運用しながら Pull Request で改善案を随時取り込むことで「生きた規約」に。  
 
