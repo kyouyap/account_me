@@ -18,67 +18,67 @@
 12. 非同期 & 並行処理  
 13. パフォーマンス最適化  
 14. セキュリティ / 安全なコード  
-15. 参考資料
+15. 参考資料  
 
 ---
 
 ## 1. 全体方針
 
-| 目的 | 具体策 |
-|------|--------|
-| **読みやすさ最優先** | *Self-Documenting Code* を目指す。意味のある変数名・関数名、重複排除（DRY）。 |
-| **自動整形の徹底** | `black`, `ruff`, `isort` を CI で強制。人間同士のスタイル議論をゼロにする。 |
-| **型安全** | 100 %型ヒント＋`mypy --strict`。曖昧さを排除し、保守コストを下げる。 |
-| **小さく作り、大きく育てる** | 小さい PR・小さい関数でフィードバックループを短縮。 |
-| **実行環境の統一** | `pyproject.toml` でバージョン固定。Docker / dev container 推奨。 |
+| 目的                       | 具体策                                    |
+|----------------------------|-------------------------------------------|
+| **読みやすさ最優先**       | Self-Documenting Code を目指す。意味のある変数名・関数名、重複排除（DRY）。 |
+| **自動整形の徹底**         | `black`, `ruff`, `isort` を CI で強制。    |
+| **型安全**                 | 100% 型ヒント + `mypy --strict`。        |
+| **小さく作り、大きく育てる** | 小さい PR・小さい関数でフィードバックループを短縮。        |
+| **実行環境の統一**         | `pyproject.toml` でバージョン固定。Docker / dev container 推奨。 |
 
 ---
 
 ## 2. 実装の選択基準
 
-> JavaScript 規約のテイストを踏襲したシンプルさで整理📝
+> JavaScript 規約のテイストを踏襲したシンプルさ📝
 
-| 選択肢 | 使う場面 | 主なメリット |
-|--------|---------|-------------|
-| **関数** | - 単純な計算・純粋関数<br>- 内部状態を保持しない | テスト容易、依存最小、読解負荷が低い |
-| **クラス** | - 内部状態を管理したい<br>- リソースのライフサイクルが必要（DBコネクタなど） | 状態と振る舞いをまとめて表現 |
-| **データクラス (`@dataclass`)** | - 不変データレコード<br>- 値オブジェクト | ボイラープレート削減、比較/排序が楽 |
-| **Enum** | - 限定された定数集合 | マジックナンバー排除、型安全 |
-| **Protocol / 抽象基底クラス** | - 実装の交換が前提<br>- テストダブル注入 | DI と相性良し、LSP 準拠 |
-| **Adapter** | - 外部 API / DB / SDK の抽象化 | テスト容易、実装差し替え |
-| **モジュール単位のシングルトン** | - 設定値やログなど一意リソース | グローバル変数より安全 |
-| **スクリプト (`if __name__ == "__main__":`)** | - ワンショット実行ツール | CLI インタフェースを簡易に用意 |
+| 選択肢                      | 使う場面                                                      | 主なメリット                         |
+|-----------------------------|---------------------------------------------------------------|--------------------------------------|
+| **関数**                    | - 単純な計算・純粋関数<br>- 内部状態を保持しない             | テスト容易、依存最小、読解負荷が低い |
+| **クラス**                  | - 内部状態を管理したい<br>- リソースのライフサイクルが必要   | 状態と振る舞いをまとめて表現         |
+| **データクラス (`@dataclass`)** | - 単なるデータレコード<br>- イミュータブルな構造を作りたい | ボイラープレート削減、比較/排序が楽   |
+| **Enum**                    | - 限定された定数集合を扱いたい                               | マジックナンバー排除、型安全         |
+| **Protocol / 抽象基底クラス** | - 実装を差し替え可能に<br>- テストダブル注入                 | DI と相性良し、LSP に沿った設計      |
+| **Adapter**                 | - 外部 API / DB / SDK の抽象化                              | テスト容易、実装差し替え可能         |
+| **モジュール単位のシングルトン** | - 設定値やログなど唯一のリソース                         | グローバル変数より安全               |
+| **スクリプト (`if __name__ == "__main__":`)** | - ワンショット実行ツール                              | シンプルな CLI インタフェース        |
 
 ---
 
 ## 3. コードスタイル & フォーマッタ
 
-| ツール | ルール |
-|-------|--------|
-| **black** | 行長 88 桁、--target-version py313 |
-| **ruff** | Pylint, flake8, isort, pep8-naming 等を統合。エラーは CI ブロッカー。 |
-| **pre-commit** | `pre-commit run --all-files` を Git hook に。 |
-| **PEP 8 準拠** | black が自動担保。例外：行長を越える Google style docstring の `Args:` セクションは許可。 |
+| ツール           | ルール                                         |
+|------------------|------------------------------------------------|
+| **black**        | 行長 88 文字、`--target-version py313`         |
+| **ruff**         | Pylint, flake8, isort, pep8-naming 等を統合。CI ブロッカー。 |
+| **pre-commit**   | `pre-commit run --all-files` を Git hook に設定。 |
+| **PEP 8 準拠**   | black で自動担保。例外：docstring の Args セクションは多少超えて可。 |
 
 ---
 
 ## 4. 型ヒント & 静的解析
 
-1. **原則すべての公開 API に型を付与**。  
-2. **`from __future__ import annotations`** を常に先頭に。  
-3. **3.13 の機能**  
-   - PEP 695: `class Box[T]: ...` の新ジェネリック構文  
-   - `Self` 型 & `typing.Sealed`（シールドクラス）  
-4. **型エイリアス宣言**  
+1. **公開 API には必ず型注釈**  
+2. **`from __future__ import annotations`** を常に先頭に記述。  
+3. **Python 3.13 の新機能**  
+   - PEP 695: 新ジェネリック構文 (`class Box[T]: ...`)  
+   - `Self` 型、`typing.Sealed`  
+4. **型エイリアス**  
    ```python
-   type JSON = dict[str, "JSON | str | int | bool | None"]  # PEP695
+   type JSON = dict[str, "JSON | str | int | bool | None"]
    ```
-5. **mypy 設定（抜粋）**
+5. **mypy 設定例** (`pyproject.toml` 抜粋)  
    ```ini
-   [mypy]
-   python_version = 3.13
-   strict = True
-   warn_unused_configs = True
+   [tool.mypy]
+   python_version = "3.13"
+   strict = true
+   warn_unused_configs = true
    ```
 
 ---
@@ -87,65 +87,92 @@
 
 ```python
 def fetch_user(user_id: int) -> User:
-    ```python
-        """単一のユーザーオブジェクトを取得します。
+    """単一のユーザー情報を取得します。
 
-        Args:
-            user_id: ユーザーの一意な識別子。
+    Args:
+        user_id: ユーザーの一意な識別子。
 
-        Returns:
-            User: 取得されたユーザーのドメインモデル。
+    Returns:
+        User: 取得されたユーザー情報オブジェクト。
 
-        Raises:
-            UserNotFoundError: ユーザーが存在しない場合。
-        """
-    ```
+    Raises:
+        UserNotFoundError: ユーザーが存在しない場合。
+
+    Examples:
+        >>> user = fetch_user(123)
+        >>> assert user.id == 123
+    """
 ```
 
-- セクション順序: **Summary → Args → Returns → Raises → Examples**  
-- 1行サマリは動詞から。  
-- **例** には `>>>` を使い doctest 可能に。
+- **セクション順序**: Summary → Args → Returns → Raises → Examples  
+- **1行サマリ** は動詞から始める。  
+- **Examples** には `>>>` を使い doctest 可能に。
 
 ---
 
 ## 6. モジュール / パッケージ構成
 
-```
+```text
 project/
+├── docs/                   # ドキュメント
 ├── src/
-│   ├── app/            # アプリケーションサービス
-│   ├── domain/         # エンティティ & 値オブジェクト
-│   ├── infra/          # DB / API 実装 (Adapter)
-│   ├── presentation/   # CLI / Web Handler
-│   └── settings.py     # Pydantic ベース設定
-├── tests/
-│   └── ...
+│   └── my_package/         # アプリケーションコード
+│       ├── models/         # データ構造・スキーマ定義
+│       ├── services/       # ビジネスロジック
+│       ├── adapters/       # 外部連携（DB, API など）
+│       ├── cli/            # CLI エントリポイント
+│       ├── utils/          # 汎用ユーティリティ
+│       └── settings.py     # 設定管理（Pydantic など）
+├── tests/                  # テストコード
 ├── pyproject.toml
 └── README.md
 ```
 
-- **`src/` レイアウト** 推奨。  
-- ドメイン駆動設計 (DDD) に合わせて `domain`, `app`, `infra`, `presentation` を分離。  
+- **トップレベル** に `src/`, `tests/`, `docs/` を配置。  
+- `my_package` 直下は役割ごとに分割して整理。  
+- プロジェクト固有の命名や追加構造は適宜追記。
 
 ---
 
 ## 7. 依存性の注入（DI）
 
-| 指針 | 例 |
-|------|----|
-| **コンストラクタインジェクションが第一候補** | ```python class UserService: def __init__(self, repo: UserRepo): ...``` |
-| **ファクトリ / Provider パターンを組み合わせる** | `providers.Factory(UserService)` (dependency-injector ライブラリなど) |
-| **設定 & 環境変数は Pydantic-Settings で吸収** | `settings.db.url` を注入 |
-| **テストでは Stub / Mock 実装に差し替え** | Protocol をキーに DI コンテナでバインド切替 |
+| 指針                          | 備考                                                   |
+|-------------------------------|------------------------------------------------------|
+| **コンストラクタインジェクション優先** | 依存性をコンストラクタで受け取る。下記コード例参照。 |
+| **Factory / Provider パターン活用**  | `providers.Factory(UserService)` （dependency-injector など） |
+| **設定 & 環境変数** は Pydantic-Settings で一元管理。 |                                                      |
+| **テスト** では Stub / Mock 実装に差し替え。      |                                                      |
+
+**コンストラクタインジェクションの例:**
+```python
+class UserService:
+    def __init__(self, repo: UserRepo) -> None:
+        self._repo = repo
+        # ...
+```
 
 ---
 
 ## 8. エラー処理 & 例外設計
 
-1. **ビジネスエラーは独自例外クラス**（`class DomainError(Exception): ...`）  
-2. **Python 組み込み例外を安易に握りつぶさない**  
-3. **`try / except / else / finally` ブロックをフル活用**  
-4. **例外メッセージはログ・モニタリングで検索可能なキーワードを含める**
+1.  **ビジネスエラー用にカスタム例外クラスを作成**
+    -   ビジネス要件に起因するエラーを表す独自の例外クラスを定義します。下記コード例参照。
+2.  **組み込み例外をむやみに握りつぶさない**
+3.  **`try / except / else / finally` を適切に使い分ける**
+4.  **例外メッセージ** はログやモニタリングで検索しやすいキーワードを含める
+
+**カスタム例外クラスの例:**
+```python
+class BusinessError(Exception):
+    """ビジネス要件に起因するエラーを表す例外。"""
+    pass
+
+class UserNotFoundError(BusinessError):
+    """指定されたユーザーが見つからない場合に発生するエラー。"""
+    def __init__(self, user_id: int) -> None:
+        super().__init__(f"User with ID {user_id} not found.")
+        self.user_id = user_id
+```
 
 ---
 
@@ -153,49 +180,52 @@ project/
 
 - `structlog` + 標準 `logging` で JSON 出力。  
 - **ログレベル基準**  
-  - DEBUG: 変数値  
+  - DEBUG: 詳細な変数値  
   - INFO: 正常系ステップ  
-  - WARNING: リトライ可能／軽微エラー  
-  - ERROR: 失敗 (アラート)  
+  - WARNING: リトライ可能な軽微エラー  
+  - ERROR: 回復不能な失敗（アラート）  
 - **ContextVar** でトレース ID を伝搬。
 
 ---
 
 ## 10. テスト指針
 
-| 項目 | 推奨 |
-|------|------|
-| **フレームワーク** | `pytest>=8`, `pytest-asyncio` |
-| **AAA パターン** | *Arrange-Act-Assert* を厳守。 |
-| **カバレッジ閾値** | 行 95 % / 分岐 90 % 以上を CI で必須。 |
-| **テストダブル** | `unittest.mock`, `pytest-mock`, `factory-boy` |
-| **フィクスチャ階層** | `conftest.py` をルートに共通化。 |
+| 項目               | 推奨                                     |
+|--------------------|------------------------------------------|
+| **フレームワーク** | `pytest>=8`, `pytest-asyncio`            |
+| **パターン**       | Arrange–Act–Assert を厳守                |
+| **カバレッジ**     | 行 95% / 分岐 90% 以上を CI で必須         |
+| **ダブル**         | `unittest.mock`, `pytest-mock`, `factory-boy` |
+| **フィクスチャ**   | `conftest.py` で共通設定をまとめる        |
 
 ---
 
 ## 11. デザインパターン実装例
 
-> **型ヒント＋Google docstring 付きのミニ実装。**
+> 型ヒント＋Google docstring 付きのミニ実装
 
 ### 11.1 Strategy
 
 ```python
 from collections.abc import Callable
-from typing import Protocol
 
 class DiscountStrategy(Protocol):
-    """Strategy インタフェース。"""
+    """価格割引のための Strategy インターフェース。"""
 
     def __call__(self, price: float) -> float: ...
+```
 
-def no_discount(price: float) -> float:  # 関数も Strategy に
+```python
+def no_discount(price: float) -> float:
+    """割引なし。"""
     return price
 
 def seasonal_discount(price: float) -> float:
+    """10% 割引。"""
     return price * 0.9
 
 class PriceCalculator:
-    """価格計算クラス (Context)。"""
+    """価格計算クラス（Context）。"""
 
     def __init__(self, strategy: DiscountStrategy = no_discount) -> None:
         self._strategy = strategy
@@ -209,14 +239,19 @@ class PriceCalculator:
 
 ```python
 class PaymentGateway:
-    """外部 SDK (既存)."""
+    """外部 SDK クラス。"""
     def send(self, payload: dict[str, str]) -> None: ...
+```
 
+```python
 class PaymentPort(Protocol):
+    """アプリ側抽象インターフェース。"""
     def pay(self, amount: int) -> None: ...
+```
 
+```python
 class PaymentAdapter:
-    """SDK をラップし抽象ポートを実装。"""
+    """SDK をラップして抽象 Port を実装。"""
 
     def __init__(self, sdk: PaymentGateway) -> None:
         self._sdk = sdk
@@ -225,44 +260,45 @@ class PaymentAdapter:
         self._sdk.send({"amount": str(amount)})
 ```
 
-*Singleton, Factory, Observer, Command* などは付録にコード例を配置（省略）。
+*(Singleton, Factory, Observer, Command などは付録にコード例を追加するとよい)*
 
 ---
 
 ## 12. 非同期 & 並行処理
 
-1. **`asyncio` を優先しスレッド乱用禁止**  
-2. **I/O バウンド処理** → `asyncio`, CPU バウンド → `concurrent.futures.ProcessPoolExecutor`  
-3. **Cancellation 伝搬** を忘れず `try/except asyncio.CancelledError`  
-4. **非同期コンテキストマネージャ** (`async with`) で接続を安全に管理。
+1. **`asyncio` を優先**（スレッド乱用禁止）  
+2. **I/O バウンド** → `asyncio`／`aiohttp`／`asyncpg`  
+   **CPU バウンド** → `concurrent.futures.ProcessPoolExecutor`  
+3. **キャンセル伝搬** を忘れず `except asyncio.CancelledError`  
+4. **非同期コンテキストマネージャ** (`async with`) で安全に管理
 
 ---
 
 ## 13. パフォーマンス最適化
 
-| レイヤ | 施策 |
-|-------|-----|
-| **アルゴリズム** | Big-O を意識。辞書・集合を活用する。 |
-| **I/O** | `aiohttp`, `asyncpg` など非同期ライブラリ。 |
-| **データ構造** | `array`, `deque`, `bisect`, `heapq` | 
-| **メモリ** | `slots=True` dataclass、`functools.cache` で重複計算削減。 |
-| **コンパイル** | `python -OO -m py_compile` や Cython / mypyc は最後の手段。 |
+| レイヤ      | 施策                                                  |
+|-------------|-------------------------------------------------------|
+| **アルゴリズム** | Big-O を意識。辞書・集合を活用。                       |
+| **I/O**        | 非同期ライブラリを活用 (`aiohttp`, `asyncpg`)        |
+| **データ構造** | `array`, `deque`, `bisect`, `heapq`                  |
+| **メモリ**     | `slots=True` dataclass、`functools.cache`            |
+| **コンパイル** | `python -OO -m py_compile`、Cython / mypyc は最後の手段 |
 
 ---
 
 ## 14. セキュリティ / 安全なコード
 
-- **依存ライブラリ脆弱性スキャン**: `pip-audit`, `safety`.  
-- **Secrets 管理**: 環境変数 & Secret Manager、ハードコード禁止。  
-- **入力値バリデーション**: Pydantic v3 の `model_validate`。  
-- **Web 開発**: インジェクション・XSS・CSRF 対策、`werkzeug.security` や OWASP ASVS を参照。  
-- **署名付き型アノテーション** で意図しないミューテーションを防ぐ。
+- **脆弱性スキャン**: `pip-audit`, `safety`  
+- **Secrets 管理**: 環境変数 & Secret Manager、ハードコード禁止  
+- **入力バリデーション**: Pydantic v3 の `model_validate`  
+- **Web 脆弱性対策**: インジェクション・XSS・CSRF 対策、OWASP ASVS 参照  
+- **イミュータブル型アノテーション** で不意のミューテーションを防止
 
 ---
 
 ### 使い方のヒント
 
-1. 本ドキュメントを **社内 Wiki / README** にそのまま貼り付けても OK。  
-2. プロジェクト固有の規定（命名プリフィックス、CI /CD など）は追記。  
-3. 運用しながら Pull Request で改善案を随時取り込むことで「生きた規約」に。  
+1. 本ドキュメントを **社内 Wiki / README** にそのまま貼り付け。  
+2. プロジェクト固有のルール（命名規則、CI/CD フローなど）は適宜追記。  
+3. 運用しながら Pull Request で改善案を取り込み、「生きた規約」に仕上げる。  
 
