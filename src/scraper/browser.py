@@ -1,4 +1,21 @@
-"""ブラウザ操作モジュール。"""
+"""Seleniumを使用したブラウザ自動操作を管理するモジュール。
+
+このモジュールは、MoneyForwardウェブサイトへのアクセスと操作を自動化します。
+ChromeDriverを使用したヘッドレスブラウザの設定、ページ要素の待機と操作、
+認証処理など、スクレイピングに必要な基本機能を提供します。
+
+主な機能:
+    - ヘッドレスChromeブラウザの設定と管理
+    - ページ要素の待機と検索
+    - MoneyForwardへのログイン処理（2段階認証対応）
+    - ダウンロードリンクの抽出
+    - セッション管理
+
+Note:
+    - ChromeDriverのパスが正しく設定されている必要があります
+    - Gmail APIを使用して2段階認証コードを取得します
+    - 設定はsettingsモジュールから読み込まれます
+"""
 
 import logging
 import os
@@ -37,14 +54,35 @@ T = TypeVar("T")
 
 @dataclass
 class ScrapingResult:
-    """スクレイピング結果を格納するデータクラス。"""
+    """スクレイピング結果を格納するデータクラス。
+
+    Attributes:
+        links (List[str]): 抽出されたダウンロードリンクのリスト
+        cookies (List[dict]): セッションのクッキー情報
+    """
 
     links: List[str]
     cookies: List[dict]
 
 
 class BrowserManager:
-    """ブラウザ操作を管理するクラス。"""
+    """ブラウザ操作を管理するクラス。
+
+    このクラスは、Seleniumを使用したブラウザ操作の全般を管理します。
+    コンテキストマネージャとして実装されており、with文での使用を想定しています。
+
+    Attributes:
+        driver (Optional[WebDriver]): Seleniumのウェブドライバインスタンス
+        timeout (int): 要素待機のタイムアウト時間（秒）
+        retry_count (int): 操作失敗時のリトライ回数
+
+    使用例:
+        ```python
+        with BrowserManager() as browser:
+            browser.login(email, password)
+            links = browser.get_links_for_download(target_url)
+        ```
+    """
 
     _by_mapping = {
         By.ID: "id",
@@ -223,23 +261,20 @@ class BrowserManager:
     ) -> str:
         """指定されたGmailアカウントに新しい認証メールが到着するのを待機します。
 
-        GmailClientを使用して定期的に最新の認証メールIDを取得し、
-        指定された`last_email_id`（前回取得したメールID）と比較します。
-        新しいメールIDが`last_email_id`と異なる場合、または`last_email_id`がNoneの場合に、
-        新しいメールが到着したと判断し、そのIDを返します。
+        新しいメールの到着を最大10回（3秒間隔）まで待機します。メール検索中に
+        一時的なエラーが発生した場合は警告を出力してリトライします。
 
-        最大`max_attempts`回まで、`wait_seconds`秒間隔でメールの到着を確認します。
-        メール検索中に一時的なエラーが発生した場合は、警告をログに出力し、リトライします。
-        指定された試行回数内に新しい認証メールが見つからなかった場合は、
-        タイムアウトとして`VerificationCodeError`を送出します。
+        Args:
+            gmail_client: Gmailへのアクセスに使用するGmailClientインスタンス
+            last_email_id: 前回取得したメールのID。このIDと異なる最新のメールを探す。
+                          Noneの場合は最初に見つかった認証メールのIDを返す。
 
-            gmail_client (GmailClient): Gmailへのアクセスに使用するGmailClientインスタンス。
-            last_email_id (Optional[str]): 前回取得したメールのID。このIDと異なる最新のメールを探します。
-                                           Noneの場合は、最初に見つかった認証メールのIDを返します。
+        Returns:
+            str: 新しく到着した認証メールのID
 
-            str: 新しく到着した認証メールのID。
-
-            VerificationCodeError: 指定された試行回数内に新しい認証メールが到着しなかった場合。
+        Raises:
+            VerificationCodeError: 指定された試行回数内に新しい認証メールが
+                                 到着しなかった場合
         """
         max_attempts = 10  # 最大待機回数
         wait_seconds = 3  # 待機間隔（秒）
@@ -266,14 +301,31 @@ class BrowserManager:
         raise VerificationCodeError("新しい認証メールの到着待機がタイムアウトしました")
 
     def login(self, email: str, password: str) -> None:
-        """MoneyForwardにログイン。
+        """MoneyForwardにログインします。
+
+        ログインフォームにメールアドレスとパスワードを入力し、必要に応じて
+        2段階認証も処理します。2段階認証コードはGmail APIを使用して取得します。
+
+        処理の流れ:
+            1. ログインページにアクセス
+            2. メールアドレスを入力
+            3. パスワードを入力
+            4. 2段階認証が必要な場合:
+                - Gmail APIで認証コードを取得
+                - 認証コードを入力
+            5. ログイン成功を確認
 
         Args:
-            email: ログイン用メールアドレス。
-            password: ログイン用パスワード。
+            email: ログイン用メールアドレス
+            password: ログイン用パスワード
 
         Raises:
-            AuthenticationError: ログインに失敗した場合。
+            AuthenticationError: 以下の場合に発生:
+                - ログインフォームの要素が見つからない
+                - 認証情報が無効
+                - 2段階認証に失敗
+                - その他のログイン処理エラー
+            ScrapingError: WebDriverが初期化されていない場合
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")

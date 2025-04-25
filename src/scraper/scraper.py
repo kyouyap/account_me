@@ -1,4 +1,26 @@
-"""スクレイピング処理を実行するメインモジュール。"""
+"""MoneyForwardからの家計データスクレイピングを実行するモジュール。
+
+このモジュールは、MoneyForwardウェブサイトから家計データを自動的に取得し、
+CSVファイルとして保存する機能を提供します。Seleniumを使用したブラウザ操作と
+データのダウンロード、集計を行います。
+
+主な機能:
+    - MoneyForwardへのログイン認証
+    - 口座情報のスクレイピング
+    - 取引履歴のスクレイピング
+    - CSVファイルのダウンロードと集計
+    - 特殊なデータ処理ルールの適用
+
+使用例:
+    ```python
+    scraper = MoneyForwardScraper()
+    scraper.scrape()  # スクレイピングを実行
+    ```
+
+Note:
+    - 実行には適切な環境変数（EMAIL, PASSWORD）の設定が必要です
+    - 処理結果は設定ファイルで指定された出力ディレクトリに保存されます
+"""
 
 import datetime
 import logging
@@ -17,10 +39,27 @@ logger = logging.getLogger(__name__)
 
 
 class MoneyForwardScraper:
-    """MoneyForwardのスクレイピングを実行するクラス。"""
+    """MoneyForwardウェブサイトからのデータスクレイピングを実行するクラス。
+
+    このクラスは、MoneyForwardウェブサイトへのログイン、データのスクレイピング、
+    CSVファイルのダウンロードと集計を一括して処理します。Seleniumを使用した
+    ブラウザ操作とファイルの操作を管理します。
+
+    Attributes:
+        download_dir (Path): ダウンロードファイルの一時保存ディレクトリ
+        browser_manager (BrowserManager): Seleniumブラウザの操作を管理
+        file_downloader (FileDownloader): ファイルのダウンロードを管理
+    """
 
     def __init__(self) -> None:
-        """スクレイパーの初期化。"""
+        """MoneyForwardScraperのインスタンスを初期化します。
+
+        初期化時に以下の処理を行います:
+            1. ダウンロードディレクトリのパス設定
+            2. ブラウザマネージャーの初期化
+            3. ファイルダウンローダーの初期化
+            4. 必要な環境変数の設定
+        """
         self.download_dir = Path(settings.paths.downloads)
         self.browser_manager = BrowserManager()
         self.file_downloader = FileDownloader(self.download_dir)
@@ -215,10 +254,23 @@ class MoneyForwardScraper:
         self._aggregate_csv_files(output_path)
 
     def scrape(self) -> None:
-        """スクレイピングを実行します。
+        """MoneyForwardからのデータスクレイピングを実行します。
+
+        以下の順序で処理を実行します:
+            1. 環境変数のチェック
+            2. 作業ディレクトリのクリーンアップ
+            3. MoneyForwardへのログイン
+            4. 口座情報のスクレイピングとCSVダウンロード
+            5. 取引履歴のスクレイピングとCSVダウンロード
+            6. ダウンロードしたCSVファイルの集計
+            7. 一時ファイルのクリーンアップ
 
         Raises:
-            MoneyForwardError: スクレイピング処理に失敗した場合
+            MoneyForwardError: 以下の場合に発生します
+                - 必要な環境変数が設定されていない
+                - ログインに失敗した
+                - スクレイピング処理中にエラーが発生
+                - CSVファイルの処理に失敗
         """
         try:
             self._check_env_variables()
