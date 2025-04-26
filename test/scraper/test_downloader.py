@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import urllib3
-
 from exceptions.custom_exceptions import DownloadError
 from scraper.downloader import FileDownloader
 
@@ -359,9 +358,10 @@ def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
     mock_settings.moneyforward.endpoints.history = "/history"
     mock_settings.moneyforward.history.months_to_download = 3
 
-    with patch("scraper.downloader.settings", mock_settings), patch.object(
-        downloader, "download_file"
-    ) as mock_download:
+    with (
+        patch("scraper.downloader.settings", mock_settings),
+        patch.object(downloader, "download_file") as mock_download,
+    ):
         # 2つ目の月のダウンロードが失敗するシナリオ
         success_path1 = downloader.download_dir / "test_0.csv"
         success_path2 = downloader.download_dir / "test_2.csv"
@@ -437,11 +437,14 @@ def test_download_from_links_continue_on_partial_failure(
     )  # ファイル自体はテストで存在を確認しないが、Path として返す
 
     # download_file のモック：最初は成功パス、次は例外を投げる
-    with patch.object(
-        downloader,
-        "download_file",
-        side_effect=[success_path, DownloadError("2 件目失敗")],
-    ), patch("scraper.downloader.settings", mock_settings):
+    with (
+        patch.object(
+            downloader,
+            "download_file",
+            side_effect=[success_path, DownloadError("2 件目失敗")],
+        ),
+        patch("scraper.downloader.settings", mock_settings),
+    ):
         result = downloader.download_from_links(mock_driver, links)
 
     # 例外は投げられず、最初のパスだけが返る
