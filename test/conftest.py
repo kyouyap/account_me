@@ -48,7 +48,7 @@ def test_settings():
             test_config = yaml.safe_load(f)
 
         # Settingsクラスのインスタンスを作成
-        test_settings = Settings.parse_obj(test_config)
+        test_settings = Settings.model_validate(test_config)
         return test_settings
 
     # テスト用の設定ファイルが存在しない場合は本番用の設定を使用

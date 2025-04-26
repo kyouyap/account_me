@@ -256,59 +256,6 @@ class BrowserManager:
                     continue
         raise ScrapingError(f"操作が{self.retry_count}回失敗しました: {last_error}")
 
-    def wait_for_new_verification_email(
-        self,
-        gmail_client: GmailClient,
-        last_email_id: Optional[str] = None,
-        max_attempts: Optional[int] = None,
-        wait_seconds: Optional[int] = None,
-    ) -> str:
-        """指定されたGmailアカウントに新しい認証メールが到着するのを待機します。
-
-        新しいメールの到着を最大試行回数（wait_seconds間隔）まで待機します。メール検索中に
-        一時的なエラーが発生した場合は警告を出力してリトライします。
-
-        Args:
-            gmail_client: Gmailへのアクセスに使用するGmailClientインスタンス
-            last_email_id: 前回取得したメールのID。このIDと異なる最新のメールを探す。
-                          Noneの場合は最初に見つかった認証メールのIDを返す。
-            max_attempts: 最大待機回数（デフォルトは10回）
-            wait_seconds: 待機間隔（秒）（デフォルトは3秒）
-
-        Returns:
-            str: 新しく到着した認証メールのID
-
-        Raises:
-            VerificationCodeError: 指定された試行回数内に新しい認証メールが
-                                 到着しなかった場合
-        """
-        # パラメータのデフォルト値を設定から取得
-        if max_attempts is None:
-            max_attempts = 10  # デフォルトの最大待機回数
-        if wait_seconds is None:
-            wait_seconds = 3  # デフォルトの待機間隔（秒）
-
-        for attempt in range(max_attempts):
-            try:
-                # 新しいメールを検索
-                email_id = gmail_client.get_latest_verification_email_id()
-
-                # 新しいメールが来ているか確認
-                if last_email_id is None or email_id != last_email_id:
-                    logger.info("新しい認証メールを検出: %s", email_id)
-                    return email_id
-
-                logger.info(
-                    "メールの到着を待機中... 試行回数: %d/%d", attempt + 1, max_attempts
-                )
-                time.sleep(wait_seconds)
-
-            except Exception as e:
-                logger.warning("メール検索中にエラー: %s", e)
-                time.sleep(wait_seconds)
-
-        raise VerificationCodeError("新しい認証メールの到着待機がタイムアウトしました")
-
     def login(self, email: str, password: str) -> None:
         """MoneyForwardにログインします。
 
@@ -365,9 +312,6 @@ class BrowserManager:
             logger.info("Gmail APIクライアントを初期化")
             gmail_client = GmailClient()
 
-            # 現在の最新メールIDを取得
-            logger.info("現在の最新メールIDを取得")
-            last_email_id = gmail_client.get_latest_verification_email_id()
             # 2段階認証の確認
             try:
                 logger.info("2段階認証フォームの有無を確認")
@@ -391,18 +335,17 @@ class BrowserManager:
                             )
                         raise
 
-                # 送信後の新しいメールを待機
-                logger.info("新しい認証メールの到着を待機")
-                new_email_id = self.wait_for_new_verification_email(
-                    gmail_client, last_email_id
-                )
-
-                # 新しいメールから認証コードを取得
-                logger.info("新しいメールから認証コードを取得")
-                verification_code = gmail_client.get_verification_code_by_id(
-                    new_email_id
-                )
-                logger.info("認証コードを取得しました: %s", verification_code)
+                # 有効な認証コードを取得
+                logger.info("有効な認証コードを取得")
+                try:
+                    # メール受信とAPI反映のために少し待機（5秒）
+                    logger.info("メール受信待機中...")
+                    time.sleep(5)
+                    verification_code = gmail_client.get_verification_code()
+                    logger.info("認証コードを取得しました: %s", verification_code)
+                except (VerificationCodeError, GmailApiError) as e:
+                    logger.error("認証コードの取得に失敗: %s", e)
+                    raise AuthenticationError(f"認証コードの取得に失敗: {e}") from e
 
                 # 認証コードを入力して送信
                 logger.info("認証コードを入力: %s", verification_code)
