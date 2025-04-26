@@ -182,6 +182,33 @@ def test_download_file_non_200_status(downloader):
         assert "ダウンロードに失敗しました" in str(exc_info.value)
 
 
+def test_monthly_data_csv_link_not_found(downloader, mock_settings, caplog):
+    """CSVリンクが見つからない場合のテスト。"""
+    mock_driver = MagicMock()
+    mock_driver.find_element.return_value = MagicMock()
+
+    # CSVリンクを取得する箇所で None を返すようにモック
+    mock_csv_link = MagicMock()
+    mock_csv_link.get_attribute.return_value = None
+    mock_driver.find_element.side_effect = [
+        MagicMock(),  # prev_button
+        MagicMock(),  # download_button
+        mock_csv_link,  # CSVリンク
+    ]
+
+    result = downloader._download_monthly_data(mock_driver, "test", 0, 1)
+
+    assert result is None
+    assert "1月目のCSVリンクの取得に失敗しました" in caplog.text
+
+
+def test_download_from_links_empty_list(downloader):
+    """空のリンクリストが渡された場合のテスト。"""
+    mock_driver = MagicMock()
+    result = downloader.download_from_links(mock_driver, [])
+    assert result == []
+
+
 def test_download_file_os_error(downloader):
     """ファイル操作エラーのテスト。"""
     mock_response = MagicMock()

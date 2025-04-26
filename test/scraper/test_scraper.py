@@ -132,9 +132,6 @@ def test_clean_directories_file_removal_error(scraper, monkeypatch):
         def glob(self, pattern):
             return [FakeFile()]
 
-        def mkdir(self, parents):
-            pass
-
     monkeypatch.setattr(scraper_module, "Path", FakePath)
     scraper._clean_directories()
 
@@ -152,12 +149,6 @@ def test_clean_directories_dir_op_error(scraper, monkeypatch):
 
         def exists(self):
             raise OSError("op fail")
-
-        def glob(self, pattern):
-            return []
-
-        def mkdir(self, parents):
-            pass
 
     monkeypatch.setattr(scraper_module, "Path", FakePath)
     scraper._clean_directories()

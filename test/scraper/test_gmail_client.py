@@ -100,18 +100,6 @@ def singlepart_message():
 
 
 @pytest.fixture
-def no_expiry_message():
-    """テスト用の有効期限パターンがないメッセージデータを返すフィクスチャ。"""
-    body = "No expiry message\nYour verification code is: 345678"
-    encoded_data = base64.b64encode(body.encode("utf-8")).decode("utf-8")
-    return {
-        "payload": {
-            "parts": [{"mimeType": "text/plain", "body": {"data": encoded_data}}]
-        }
-    }
-
-
-@pytest.fixture
 def invalid_multipart_message():
     """テスト用の無効なマルチパートメッセージデータを返すフィクスチャ。"""
     body = "Invalid message"
