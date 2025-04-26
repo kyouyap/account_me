@@ -20,13 +20,13 @@ CSVファイルとして保存する機能を提供します。Seleniumを使用
 Note:
     - 実行には適切な環境変数（EMAIL, PASSWORD）の設定が必要です
     - 処理結果は設定ファイルで指定された出力ディレクトリに保存されます
+
 """
 
 import datetime
 import logging
 import os
 from pathlib import Path
-from typing import List
 
 import pandas as pd
 
@@ -49,6 +49,7 @@ class MoneyForwardScraper:
         download_dir (Path): ダウンロードファイルの一時保存ディレクトリ
         browser_manager (BrowserManager): Seleniumブラウザの操作を管理
         file_downloader (FileDownloader): ファイルのダウンロードを管理
+
     """
 
     def __init__(self) -> None:
@@ -74,6 +75,7 @@ class MoneyForwardScraper:
 
         Raises:
             MoneyForwardError: 必要な環境変数が設定されていない場合。
+
         """
         required_vars = ["EMAIL", "PASSWORD"]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
@@ -115,6 +117,7 @@ class MoneyForwardScraper:
 
         Returns:
             pd.DataFrame | None: 読み込んだデータフレーム。読み込みに失敗した場合はNone。
+
         """
         # ファイルサイズチェック
         if file_path.stat().st_size == 0:
@@ -149,14 +152,14 @@ class MoneyForwardScraper:
                     encoding,
                     str(e),
                 )
-                decode_errors.append(f"{encoding}: {str(e)}")
+                decode_errors.append(f"{encoding}: {e!s}")
             except Exception as e:
                 logger.error(
                     "ファイル '%s' の読み込み中に予期せぬエラーが発生: %s",
                     file_path,
                     str(e),
                 )
-                errors.append(f"{encoding}: {str(e)}")
+                errors.append(f"{encoding}: {e!s}")
 
         if decode_errors:
             logger.error(
@@ -180,10 +183,11 @@ class MoneyForwardScraper:
 
         Raises:
             MoneyForwardError: CSVファイルの集約に失敗した場合。
+
         """
         try:
             # CSVファイルを読み込んで結合
-            all_dfs: List[pd.DataFrame] = []
+            all_dfs: list[pd.DataFrame] = []
             csv_files = list(self.download_dir.glob("*.csv"))
             logger.info("集約対象のCSVファイル数: %d", len(csv_files))
 
@@ -209,7 +213,7 @@ class MoneyForwardScraper:
                         exc_info=True,
                     )
                     raise MoneyForwardError(
-                        f"CSVファイルの処理に失敗しました: {str(e)}"
+                        f"CSVファイルの処理に失敗しました: {e!s}"
                     ) from e
 
             if all_dfs:
@@ -232,7 +236,7 @@ class MoneyForwardScraper:
 
         except Exception as e:
             logger.error("CSVファイルの集約中にエラーが発生しました:", exc_info=True)
-            raise MoneyForwardError(f"CSVファイルの集約に失敗しました: {str(e)}") from e
+            raise MoneyForwardError(f"CSVファイルの集約に失敗しました: {e!s}") from e
 
     def _download_and_aggregate(
         self, browser: BrowserManager, endpoint: str, output_path: Path
@@ -246,6 +250,7 @@ class MoneyForwardScraper:
 
         Raises:
             MoneyForwardError: データのダウンロードや集約に失敗した場合
+
         """
         links = browser.get_links_for_download(endpoint)
         logger.info("ダウンロードリンクを取得しました: %d件", len(links))
@@ -271,6 +276,7 @@ class MoneyForwardScraper:
                 - ログインに失敗した
                 - スクレイピング処理中にエラーが発生
                 - CSVファイルの処理に失敗
+
         """
         try:
             self._check_env_variables()
@@ -317,7 +323,7 @@ class MoneyForwardScraper:
                     )
                 except Exception as e:
                     logger.error("ブラウザ操作中にエラーが発生しました:", exc_info=True)
-                    error_message = f"スクレイピングに失敗しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+                    error_message = f"スクレイピングに失敗しました。詳細:\n{e.__class__.__name__}: {e!s}"
                     raise MoneyForwardError(error_message) from e
 
             self.file_downloader.clean_download_dir()
@@ -329,6 +335,6 @@ class MoneyForwardScraper:
             logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
             error_message = (
-                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {str(e)}"
+                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {e!s}"
             )
             raise MoneyForwardError(error_message) from e

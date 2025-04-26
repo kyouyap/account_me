@@ -1,12 +1,13 @@
 """テストの共通設定。"""
 
 import sys
-import pytest
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 import yaml
 
-from config.settings import settings, Settings
+from config.settings import Settings, settings
 
 # テストファイルのディレクトリパスを取得
 test_dir = Path(__file__).parent
@@ -44,7 +45,7 @@ def test_settings():
 
     # テスト用の設定ファイルが存在する場合は読み込む
     if test_settings_path.exists():
-        with open(test_settings_path, "r", encoding="utf-8") as f:
+        with open(test_settings_path, encoding="utf-8") as f:
             test_config = yaml.safe_load(f)
 
         # Settingsクラスのインスタンスを作成

@@ -22,24 +22,24 @@ Note:
     - 適切なGmail API認証情報が必要です
     - Secret Managerでトークンを管理します
     - 日本時間（UTC+9）で有効期限を処理します
+
 """
 
 import base64
 import datetime
-import logging
-import re
-import socket
-from typing import Tuple, TypedDict
 import json
+import logging
 import os
+import re
+from typing import TypedDict
 
-from config.secrets import update_secret
-from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-import googleapiclient.discovery as discovery
+from googleapiclient import discovery
 from googleapiclient.errors import HttpError
 
+from config.secrets import update_secret
 from exceptions.custom_exceptions import GmailApiError, VerificationCodeError
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ class AuthSettings(TypedDict):
         subject (str): 認証メールの件名
         code_pattern (str): 認証コードを抽出する正規表現パターン
         code_timeout_minutes (int): 認証コードの有効期限（分）
+
     """
 
     sender: str
@@ -87,6 +88,7 @@ class GmailClient:
         code = client.get_verification_code()
         print(f"認証コード: {code}")
         ```
+
     """
 
     auth_settings: AuthSettings
@@ -109,6 +111,7 @@ class GmailClient:
 
         Raises:
             GmailApiError: 設定の取得に失敗した場合
+
         """
         client_secrets_str = os.getenv("GMAIL_CREDENTIALS")
         if not client_secrets_str:
@@ -123,6 +126,7 @@ class GmailClient:
 
         Returns:
             Credentials | None: 有効なクレデンシャルまたはNone
+
         """
         token_str = os.getenv("GMAIL_API_TOKEN")
         if not token_str:
@@ -146,6 +150,7 @@ class GmailClient:
 
         Returns:
             Credentials: 更新されたクレデンシャル
+
         """
         logger.info("期限切れトークンを更新")
         creds.refresh(Request())
@@ -161,6 +166,7 @@ class GmailClient:
 
         Returns:
             Credentials: 新規作成されたクレデンシャル
+
         """
         logger.info("新規認証フローを開始")
         flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
@@ -178,6 +184,7 @@ class GmailClient:
 
         Raises:
             GmailApiError: サービスの作成に失敗した場合
+
         """
         try:
             logger.info("Gmail APIサービスの作成を開始")
@@ -212,6 +219,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: 本文の抽出に失敗した場合
+
         """
         logger.info("メール本文の解析を開始")
 
@@ -240,6 +248,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: コードの抽出に失敗した場合
+
         """
         logger.info("認証コードのパターンマッチを試行")
         code_match = CODE_PATTERN.search(body)
@@ -263,6 +272,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: 有効期限の抽出に失敗した場合
+
         """
         logger.info("有効期限のパターンマッチを試行")
         expiry_match = EXPIRY_PATTERN.search(body)
@@ -280,7 +290,7 @@ class GmailClient:
         logger.info("有効期限を解析しました: %s", expiry)
         return expiry
 
-    def _parse_message(self, message: dict) -> Tuple[str, datetime.datetime]:
+    def _parse_message(self, message: dict) -> tuple[str, datetime.datetime]:
         """メッセージから認証コードと有効期限を抽出。
 
         Args:
@@ -291,6 +301,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: コードの抽出に失敗した場合
+
         """
         try:
             body = self._extract_email_body(message)
@@ -314,6 +325,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: メールの取得に失敗した場合
+
         """
         query = (
             f"from:{self.auth_settings['sender']} "
@@ -329,7 +341,7 @@ class GmailClient:
                 .list(userId="me", q=query, maxResults=max_results)
                 .execute()
             )
-        except (HttpError, socket.timeout) as e:
+        except (TimeoutError, HttpError) as e:
             logger.error("Gmail APIのリクエストに失敗: %s", e)
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
 
@@ -359,6 +371,7 @@ class GmailClient:
 
         Raises:
             VerificationCodeError: コードの取得に失敗した場合
+
         """
         logger.info("メールID: %s の取得を開始", msg_id)
 
@@ -369,7 +382,7 @@ class GmailClient:
                 .get(userId="me", id=msg_id, format="full")
                 .execute()
             )
-        except (HttpError, socket.timeout) as e:
+        except (TimeoutError, HttpError) as e:
             logger.error("Gmail APIのリクエストに失敗: %s", e)
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
 
@@ -404,6 +417,7 @@ class GmailClient:
         Raises:
             VerificationCodeError: 有効な認証コードが見つからない場合
             GmailApiError: Gmail APIのリクエストに失敗した場合
+
         """
         logger.info("有効な認証コードの取得処理を開始")
 

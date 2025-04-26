@@ -12,19 +12,20 @@
 
 Note:
     実行には適切なGCPプロジェクト設定とSecret Managerへのアクセス権限が必要です。
+
 """
 
-from google.cloud import secretmanager
+import logging
 import os
 import subprocess
-import logging
-from typing import Optional
+
+from google.cloud import secretmanager
 
 from exceptions.custom_exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
-_project_number: Optional[str] = None
+_project_number: str | None = None
 
 
 def get_project_number() -> str:
@@ -39,6 +40,7 @@ def get_project_number() -> str:
 
     Raises:
         ConfigurationError: プロジェクトIDまたはプロジェクト番号の取得に失敗した場合
+
     """
     global _project_number
     if _project_number is None:
@@ -88,6 +90,7 @@ def get_secrets() -> None:
 
     Raises:
         ConfigurationError: シークレットの取得または環境変数の設定に失敗した場合
+
     """
     try:
         client = secretmanager.SecretManagerServiceClient()
@@ -131,6 +134,7 @@ def update_secret(secret_name: str, secret_value: str) -> None:
             - シークレットが存在しない
             - 更新権限がない
             - その他のAPI関連エラー
+
     """
     try:
         client = secretmanager.SecretManagerServiceClient()

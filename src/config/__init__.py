@@ -49,7 +49,7 @@ class Config:
                     f"設定ファイルが正しくありません: {settings_path}"
                 )
 
-            with open(settings_path, "r", encoding="utf-8") as f:
+            with open(settings_path, encoding="utf-8") as f:
                 content = f.read()
                 if not content.strip():
                     raise ConfigurationError(f"設定ファイルが空です: {settings_path}")
@@ -70,8 +70,7 @@ class Config:
         load_dotenv()
 
     def get_setting(self, *keys: str) -> Any:
-        """
-        設定値を取得する。
+        """設定値を取得する。
 
         Args:
             *keys: 設定値へのパスを表すキーのシーケンス。
@@ -81,6 +80,7 @@ class Config:
 
         Raises:
             ConfigurationError: 設定値が見つからない場合。
+
         """
         value = self.settings
         for key in keys:
@@ -91,17 +91,17 @@ class Config:
         return value
 
     @property
-    def moneyforward(self) -> Dict[str, Any]:
+    def moneyforward(self) -> dict[str, Any]:
         """MoneyForward関連の設定を取得する。"""
         return self.get_setting("moneyforward")
 
     @property
-    def spreadsheet(self) -> Dict[str, Any]:
+    def spreadsheet(self) -> dict[str, Any]:
         """スプレッドシート関連の設定を取得する。"""
         return self.get_setting("spreadsheet")
 
     @property
-    def paths(self) -> Dict[str, Any]:
+    def paths(self) -> dict[str, Any]:
         """パス関連の設定を取得する。"""
         return self.get_setting("paths")
 

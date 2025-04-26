@@ -13,6 +13,7 @@ HTTPダウンロードとSeleniumを組み合わせて安定したファイル�
 Note:
     - ダウンロードには適切なセッションクッキーが必要です
     - 一時ファイルは自動的にクリーンアップされます
+
 """
 
 import logging
@@ -20,7 +21,6 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import urllib3
 from selenium.webdriver.common.by import By
@@ -49,12 +49,13 @@ class FileDownloader:
         downloader.prepare_download_dir()
         downloaded_files = downloader.download_from_links(driver, links)
         ```
+
     """
 
     def __init__(self, download_dir: Path) -> None:
-        """
-        Args:
-            download_dir: ダウンロードディレクトリのパス。
+        """Args:
+        download_dir: ダウンロードディレクトリのパス。
+
         """
         self.download_dir = download_dir
         self.http = urllib3.PoolManager()
@@ -79,16 +80,17 @@ class FileDownloader:
                 "ダウンロードディレクトリのクリーンアップに失敗しました: %s", e
             )
 
-    def get_latest_downloaded_file(self) -> Optional[Path]:
+    def get_latest_downloaded_file(self) -> Path | None:
         """最新のダウンロードファイルを取得。
 
         Returns:
             Optional[Path]: 最新のファイルパス、ファイルがない場合はNone。
+
         """
         files = list(self.download_dir.glob("download*"))
         return max(files, key=os.path.getctime) if files else None
 
-    def convert_cookies(self, selenium_cookies: List[Dict]) -> Dict[str, str]:
+    def convert_cookies(self, selenium_cookies: list[dict]) -> dict[str, str]:
         """Seleniumのクッキーをurllib3形式に変換。
 
         Args:
@@ -96,6 +98,7 @@ class FileDownloader:
 
         Returns:
             Dict[str, str]: urllib3用のクッキー文字列。
+
         """
         return {cookie["name"]: cookie["value"] for cookie in selenium_cookies}
 
@@ -103,9 +106,9 @@ class FileDownloader:
         self,
         driver: WebDriver,
         download_url: str,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
         wait_time: int = 5,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """ファイルをダウンロード。
 
         Args:
@@ -119,6 +122,7 @@ class FileDownloader:
 
         Raises:
             DownloadError: ダウンロードに失敗した場合。
+
         """
         try:
             # クッキー情報を取得して変換
@@ -161,8 +165,8 @@ class FileDownloader:
             ) from e
 
     def download_from_links(
-        self, driver: WebDriver, links: List[str], base_name: str = "download"
-    ) -> List[Path]:
+        self, driver: WebDriver, links: list[str], base_name: str = "download"
+    ) -> list[Path]:
         """複数のリンクからファイルをダウンロードします。
 
         MoneyForwardの口座情報ページと履歴ページの両方に対応し、
@@ -192,6 +196,7 @@ class FileDownloader:
                 - 全てのダウンロードが失敗
                 - 最初のダウンロードが失敗
                 - ファイルの保存に失敗
+
         """
         downloaded_files = []
         for i, link in enumerate(links):
@@ -279,7 +284,7 @@ class FileDownloader:
                                         )
                             except Exception as month_error:
                                 logger.error(
-                                    f"{j}月目のダウンロードでエラーが発生: {str(month_error)}"
+                                    f"{j}月目のダウンロードでエラーが発生: {month_error!s}"
                                 )
                                 continue
 
@@ -291,13 +296,13 @@ class FileDownloader:
 
                     except Exception as account_error:
                         logger.error(
-                            f"アカウントページの処理でエラーが発生: {str(account_error)}"
+                            f"アカウントページの処理でエラーが発生: {account_error!s}"
                         )
                         if (
                             not downloaded_files
                         ):  # まだ1件もダウンロードできていない場合
                             raise DownloadError(
-                                f"アカウントページの処理に失敗: {str(account_error)}"
+                                f"アカウントページの処理に失敗: {account_error!s}"
                             )
 
             except Exception as e:
@@ -309,7 +314,7 @@ class FileDownloader:
                 )
                 # 一部成功している場合は継続、全て失敗している場合は中断
                 if not downloaded_files:
-                    raise DownloadError(f"最初のダウンロードに失敗しました: {str(e)}")
+                    raise DownloadError(f"最初のダウンロードに失敗しました: {e!s}")
                 continue
 
         if not downloaded_files and links:
@@ -319,11 +324,10 @@ class FileDownloader:
                 len(links),
             )
             raise DownloadError(error_msg)
-        else:
-            if links and len(downloaded_files) < len(links):
-                logger.warning(
-                    "一部のダウンロードのみ成功しました。成功数: %d/%d",
-                    len(downloaded_files),
-                    len(links),
-                )
-            return downloaded_files
+        if links and len(downloaded_files) < len(links):
+            logger.warning(
+                "一部のダウンロードのみ成功しました。成功数: %d/%d",
+                len(downloaded_files),
+                len(links),
+            )
+        return downloaded_files

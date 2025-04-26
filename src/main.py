@@ -10,14 +10,15 @@
 Note:
     実行には適切な認証情報とアクセス権限が必要です。
     設定は config/ ディレクトリ下の各設定ファイルで管理されています。
+
 """
 
 import logging
+
 from config.logging_config import setup_logging
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
 from spreadsheet.sync import SpreadsheetSync
-
 
 # ロギング設定
 setup_logging()
@@ -37,6 +38,7 @@ def run_scraping() -> None:
     Raises:
         MoneyForwardError: スクレイピング処理で発生したエラー
         Exception: その他の予期せぬエラー
+
     """
     try:
         # スクレイピングの実行

@@ -1,8 +1,10 @@
 import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
 import pytest
+
 import config.secrets as secrets_mod
 import scraper.scraper as scraper_module
 from exceptions.custom_exceptions import MoneyForwardError
@@ -17,8 +19,7 @@ TEST_CREDENTIALS = {
 
 @pytest.fixture(autouse=True)
 def patch_get_secrets(monkeypatch):
-    """
-    MoneyForwardScraper.__init__ 内で呼ばれる get_secrets() を
+    """MoneyForwardScraper.__init__ 内で呼ばれる get_secrets() を
     no-op に置き換えて SecretManager 呼び出しを抑制。
     """
     monkeypatch.setattr(secrets_mod, "get_secrets", lambda: None)

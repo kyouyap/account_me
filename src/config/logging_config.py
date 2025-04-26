@@ -12,6 +12,7 @@ YAMLファイルベースの詳細設定と、フォールバック用の基本�
 Note:
     設定ファイルは config/logging.yaml に配置する必要があります。
     ファイルが存在しない場合は、基本的なロギング設定が使用されます。
+
 """
 
 import logging
@@ -40,13 +41,14 @@ def setup_logging() -> None:
     Raises:
         OSError: ログディレクトリの作成に失敗した場合
         yaml.YAMLError: YAML設定ファイルの解析に失敗した場合
+
     """
     base_dir = Path(os.getenv("APP_BASE_DIR", "/app"))
     config_path = base_dir / "config/logging.yaml"
     log_dir = base_dir / "log"
     log_dir.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
             logging.config.dictConfig(config)
     else:

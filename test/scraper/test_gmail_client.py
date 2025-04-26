@@ -1,21 +1,22 @@
 """GmailClientのテストモジュール。"""
 
-from unittest.mock import MagicMock, patch
 import base64
 import datetime
 import json
-import socket
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
 from google.auth.exceptions import RefreshError
-from googleapiclient.errors import HttpError
-from scraper.gmail_client import (
-    GmailClient,
-    GmailApiError,
-    VerificationCodeError,
-    SCOPES,
-)
 from google.oauth2.credentials import Credentials
+from googleapiclient.errors import HttpError
+
+from scraper.gmail_client import (
+    SCOPES,
+    GmailApiError,
+    GmailClient,
+    VerificationCodeError,
+)
 
 
 @pytest.fixture
@@ -563,7 +564,7 @@ def test_get_verification_code_no_messages(gmail_client):
 def test_get_verification_code_socket_timeout(gmail_client):
     """ソケットタイムアウトが発生した場合のエラー処理を確認する。"""
     mock_service = gmail_client.service
-    mock_service.users().messages().list().execute.side_effect = socket.timeout(
+    mock_service.users().messages().list().execute.side_effect = TimeoutError(
         "Connection timed out"
     )
 
