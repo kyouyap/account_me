@@ -257,17 +257,23 @@ class BrowserManager:
         raise ScrapingError(f"操作が{self.retry_count}回失敗しました: {last_error}")
 
     def wait_for_new_verification_email(
-        self, gmail_client: GmailClient, last_email_id: Optional[str] = None
+        self,
+        gmail_client: GmailClient,
+        last_email_id: Optional[str] = None,
+        max_attempts: Optional[int] = None,
+        wait_seconds: Optional[int] = None,
     ) -> str:
         """指定されたGmailアカウントに新しい認証メールが到着するのを待機します。
 
-        新しいメールの到着を最大10回（3秒間隔）まで待機します。メール検索中に
+        新しいメールの到着を最大試行回数（wait_seconds間隔）まで待機します。メール検索中に
         一時的なエラーが発生した場合は警告を出力してリトライします。
 
         Args:
             gmail_client: Gmailへのアクセスに使用するGmailClientインスタンス
             last_email_id: 前回取得したメールのID。このIDと異なる最新のメールを探す。
                           Noneの場合は最初に見つかった認証メールのIDを返す。
+            max_attempts: 最大待機回数（デフォルトは10回）
+            wait_seconds: 待機間隔（秒）（デフォルトは3秒）
 
         Returns:
             str: 新しく到着した認証メールのID
@@ -276,8 +282,11 @@ class BrowserManager:
             VerificationCodeError: 指定された試行回数内に新しい認証メールが
                                  到着しなかった場合
         """
-        max_attempts = 10  # 最大待機回数
-        wait_seconds = 3  # 待機間隔（秒）
+        # パラメータのデフォルト値を設定から取得
+        if max_attempts is None:
+            max_attempts = 10  # デフォルトの最大待機回数
+        if wait_seconds is None:
+            wait_seconds = 3  # デフォルトの待機間隔（秒）
 
         for attempt in range(max_attempts):
             try:

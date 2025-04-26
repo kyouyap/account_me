@@ -1,0 +1,64 @@
+moneyforward:
+  base_url: "https://moneyforward.com"
+  endpoints:
+    login: "/users/sign_in"
+    accounts: "/accounts"
+    history: "/bs/history"
+  selenium:
+    download_directory: "/app/test/downloads"
+    timeout: 1  # 本番の5秒から短縮（整数値に変更）
+    retry_count: 3  # リトライテスト用に3回に設定
+  special_rules:
+    - institution: "アメリカン・エキスプレスカード"
+      action: "divide_amount"
+      value: 2
+  history:
+    months_to_download: 1  # 本番の3か月から1か月に短縮
+
+spreadsheet:
+  worksheets:
+    household_data:
+      name: "@家計簿データ 貼付"
+      start_row: 4
+      columns:
+        - name: "計算対象"
+          col: 3
+        - name: "日付"
+          col: 4
+        - name: "内容"
+          col: 5
+        - name: "金額（円）"
+          col: 6
+        - name: "保有金融機関"
+          col: 7
+        - name: "大項目"
+          col: 8
+        - name: "中項目"
+          col: 9
+        - name: "メモ"
+          col: 10
+        - name: "振替"
+          col: 11
+        - name: "ID"
+          col: 12
+    assets_data:
+      name: "@資産推移 貼付"
+      start_row: 4
+      columns:
+        - name: "日付"
+          col: 1
+        - name: "合計（円）"
+          col: 2
+        - name: "預金・現金・暗号資産（円）"
+          col: 3
+        - name: "投資信託（円）"
+          col: 4
+
+paths:
+  chrome_driver: "/usr/local/bin/chromedriver"
+  outputs:
+    base: "/app/test/outputs"
+    aggregated_files:
+      detail: "/app/test/outputs/aggregated_files/detail"
+      assets: "/app/test/outputs/aggregated_files/assets"
+  downloads: "/app/test/downloads"

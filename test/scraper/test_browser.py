@@ -300,7 +300,7 @@ def test_login_success_with_2fa(
 
 
 def test_login_2fa_code_expired(
-    browser_manager, mock_browser_setup, mock_form_elements
+    browser_manager, mock_browser_setup, mock_form_elements, test_settings
 ):
     """2段階認証コードの有効期限切れのテスト。"""
     mock_setup = mock_browser_setup
@@ -309,12 +309,19 @@ def test_login_2fa_code_expired(
         "認証コードの有効期限が切れています"
     )
 
-    with patch.object(browser_manager, "wait_and_find_element") as mock_find:
+    with patch.object(
+        browser_manager, "wait_and_find_element"
+    ) as mock_find, patch.object(
+        browser_manager, "wait_for_new_verification_email"
+    ) as mock_wait:
         mock_find.side_effect = [
             mock_form_elements["email"],
             mock_form_elements["password"],
             mock_form_elements["code"],
         ]
+
+        # wait_for_new_verification_emailが呼ばれると例外を発生させる
+        mock_wait.side_effect = VerificationCodeError("認証メール待機がタイムアウト")
 
         with pytest.raises(AuthenticationError) as exc_info:
             browser_manager.login("test@example.com", "password123")
