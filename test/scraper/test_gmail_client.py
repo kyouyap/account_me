@@ -10,6 +10,7 @@ import pytest
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
+
 from scraper.gmail_client import (
     SCOPES,
     GmailApiError,

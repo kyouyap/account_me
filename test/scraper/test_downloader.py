@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import urllib3
+
 from exceptions.custom_exceptions import DownloadError
 from scraper.downloader import FileDownloader
 

@@ -29,11 +29,11 @@ import os
 from pathlib import Path
 
 import pandas as pd
+
+from config.settings import settings
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.browser import BrowserManager
 from scraper.downloader import FileDownloader
-
-from config.settings import settings
 
 logger = logging.getLogger(__name__)
 

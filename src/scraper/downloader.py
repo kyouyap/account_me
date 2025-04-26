@@ -23,11 +23,11 @@ import time
 from pathlib import Path
 
 import urllib3
-from exceptions.custom_exceptions import DownloadError
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from config.settings import settings
+from exceptions.custom_exceptions import DownloadError
 
 logger = logging.getLogger(__name__)
 
