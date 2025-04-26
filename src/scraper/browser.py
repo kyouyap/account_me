@@ -160,7 +160,9 @@ class BrowserManager:
         chrome_options.add_argument("--lang=ja")  # 日本語に設定
         chrome_options.add_argument("--window-size=1920x1080")
         chrome_options.add_argument(
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/58.0.3029.110 Safari/537.3"
         )
 
         # ダウンロード設定
@@ -250,7 +252,8 @@ class BrowserManager:
                 last_error = e
                 if attempt < self.retry_count - 1:
                     logger.warning(
-                        "要素操作が失敗しました（リトライ %d/%d）: 要素 '%s=%s' に対する操作に失敗: %s",
+                        "要素操作が失敗しました（リトライ %d/%d）: "
+                        "要素 '%s=%s' に対する操作に失敗: %s",
                         attempt + 1,
                         self.retry_count,
                         args[0] if args else "unknown",
@@ -488,14 +491,16 @@ class BrowserManager:
                         logger.info("リンクを抽出しました: %s", link)
                 except (NoSuchElementException, StaleElementReferenceException) as e:
                     logger.warning(
-                        "アカウントリンクの抽出に失敗しました: %s（現在の抽出済みリンク数: %d）",
+                        "アカウントリンクの抽出に失敗しました: %s"
+                        "（現在の抽出済みリンク数: %d）",
                         e,
                         len(links),
                     )
                     continue
 
             logger.info(
-                "アカウントページからのリンク抽出が完了しました。抽出されたリンク数: %d",
+                "アカウントページからのリンク抽出が完了しました。"
+                "抽出されたリンク数: %d",
                 len(links),
             )
             return links

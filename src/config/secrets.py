@@ -1,7 +1,7 @@
 """GCP Secret Managerを使用したシークレット管理モジュール。
 
-このモジュールは、アプリケーションで使用する機密情報をGoogle Cloud Platform (GCP) Secret Manager
-を通じて安全に管理します。
+このモジュールは、アプリケーションで使用する機密情報を
+Google Cloud Platform (GCP) Secret Managerを通じて安全に管理します。
 
 主な機能:
     - MoneyForward認証情報の取得
@@ -73,7 +73,7 @@ def get_project_number() -> str:
             if not _project_number:
                 raise ConfigurationError("プロジェクト番号の取得に失敗しました")
         except subprocess.CalledProcessError as e:
-            raise ConfigurationError(f"プロジェクト番号の取得に失敗: {e}")
+            raise ConfigurationError(f"プロジェクト番号の取得に失敗: {e}") from e
     return _project_number
 
 
@@ -115,10 +115,10 @@ def get_secrets() -> None:
             except Exception as e:
                 raise ConfigurationError(
                     f"シークレット '{secret_name}' の取得に失敗: {e}"
-                )
+                ) from e
 
     except Exception as e:
-        raise ConfigurationError(f"シークレットの取得に失敗: {e}")
+        raise ConfigurationError(f"シークレットの取得に失敗: {e}") from e
 
 
 def update_secret(secret_name: str, secret_value: str) -> None:
@@ -151,10 +151,12 @@ def update_secret(secret_name: str, secret_value: str) -> None:
             )
             logger.info("シークレット '%s' を更新しました", secret_name)
         except Exception as e:
-            raise ConfigurationError(f"シークレット '{secret_name}' の更新に失敗: {e}")
+            raise ConfigurationError(
+                f"シークレット '{secret_name}' の更新に失敗: {e}"
+            ) from e
 
     except Exception as e:
-        raise ConfigurationError(f"シークレットの更新に失敗: {e}")
+        raise ConfigurationError(f"シークレットの更新に失敗: {e}") from e
 
 
 if __name__ == "__main__":

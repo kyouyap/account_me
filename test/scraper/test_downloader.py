@@ -359,28 +359,28 @@ def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
     mock_settings.moneyforward.endpoints.history = "/history"
     mock_settings.moneyforward.history.months_to_download = 3
 
-    with patch("scraper.downloader.settings", mock_settings):
-        with patch.object(downloader, "download_file") as mock_download:
-            # 2つ目の月のダウンロードが失敗するシナリオ
-            success_path1 = downloader.download_dir / "test_0.csv"
-            success_path2 = downloader.download_dir / "test_2.csv"
-            success_path1.touch()
-            success_path2.touch()
+    with patch("scraper.downloader.settings", mock_settings), patch.object(
+        downloader, "download_file"
+    ) as mock_download:
+        # 2つ目の月のダウンロードが失敗するシナリオ
+        success_path1 = downloader.download_dir / "test_0.csv"
+        success_path2 = downloader.download_dir / "test_2.csv"
+        success_path1.touch()
+        success_path2.touch()
 
-            mock_download.side_effect = [
-                success_path1,
-                DownloadError("2ヶ月目のダウンロード失敗"),
-                success_path2,
-            ]
+        mock_download.side_effect = [
+            success_path1,
+            DownloadError("2ヶ月目のダウンロード失敗"),
+            success_path2,
+        ]
 
-            downloaded_files = downloader.download_from_links(mock_driver, links)
+        downloaded_files = downloader.download_from_links(mock_driver, links)
 
-            assert len(downloaded_files) == 2
-            assert downloaded_files == [success_path1, success_path2]
-            assert (
-                "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗"
-                in caplog.text
-            )
+        assert len(downloaded_files) == 2
+        assert downloaded_files == [success_path1, success_path2]
+        assert (
+            "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗" in caplog.text
+        )
 
 
 def test_account_page_selenium_errors(downloader, mock_settings, caplog):
@@ -424,7 +424,10 @@ def test_download_from_links_continue_on_partial_failure(
     mock_driver = MagicMock()
 
     # settings.moneyforward.base_url + endpoints.history と完全一致させる
-    history_url = f"{mock_settings.moneyforward.base_url}{mock_settings.moneyforward.endpoints.history}"
+    history_url = (
+        f"{mock_settings.moneyforward.base_url}"
+        f"{mock_settings.moneyforward.endpoints.history}"
+    )
     links = [history_url, history_url]
 
     # 1 回目の成功用パスを用意
@@ -438,10 +441,8 @@ def test_download_from_links_continue_on_partial_failure(
         downloader,
         "download_file",
         side_effect=[success_path, DownloadError("2 件目失敗")],
-    ):
-        # 設定オブジェクトもパッチ
-        with patch("scraper.downloader.settings", mock_settings):
-            result = downloader.download_from_links(mock_driver, links)
+    ), patch("scraper.downloader.settings", mock_settings):
+        result = downloader.download_from_links(mock_driver, links)
 
     # 例外は投げられず、最初のパスだけが返る
     assert result == [success_path]

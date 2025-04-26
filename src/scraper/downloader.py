@@ -71,7 +71,8 @@ class FileDownloader:
                 file.unlink()
             files_count = len(list(self.download_dir.glob("*")))
             logger.info(
-                "ダウンロードディレクトリをクリーンアップしました: %s（削除ファイル数: %d）",
+                "ダウンロードディレクトリをクリーンアップしました: %s"
+                "（削除ファイル数: %d）",
                 self.download_dir,
                 files_count,
             )
@@ -234,7 +235,8 @@ class FileDownloader:
                         for j in range(months):
                             try:
                                 logger.info(
-                                    "過去のデータをダウンロード中: %d/%d（%d月前のデータ）",
+                                    "過去のデータをダウンロード中: %d/%d"
+                                    "（%d月前のデータ）",
                                     j + 1,
                                     months,
                                     j,
@@ -274,7 +276,8 @@ class FileDownloader:
                                     if downloaded_file and downloaded_file.exists():
                                         month_files.append(downloaded_file)
                                         logger.info(
-                                            "ファイルのダウンロードが完了しました: %s（サイズ: %.2f KB）",
+                                            "ファイルのダウンロードが完了しました: %s"
+                                            "（サイズ: %.2f KB）",
                                             downloaded_file.name,
                                             downloaded_file.stat().st_size / 1024,
                                         )
@@ -284,7 +287,8 @@ class FileDownloader:
                                         )
                             except Exception as month_error:
                                 logger.error(
-                                    f"{j}月目のダウンロードでエラーが発生: {month_error!s}"
+                                    f"{j}月目のダウンロードでエラーが発生: "
+                                    f"{month_error!s}"
                                 )
                                 continue
 
@@ -303,22 +307,28 @@ class FileDownloader:
                         ):  # まだ1件もダウンロードできていない場合
                             raise DownloadError(
                                 f"アカウントページの処理に失敗: {account_error!s}"
-                            )
+                            ) from account_error
 
             except Exception as e:
                 error_msg = str(e)
                 logger.error(
-                    "ファイルのダウンロードに失敗しました - リンク: %s, 成功済みファイル数: %d",
+                    "ファイルのダウンロードに失敗しました - リンク: %s, "
+                    "成功済みファイル数: %d",
                     link,
                     len(downloaded_files),
                 )
                 # 一部成功している場合は継続、全て失敗している場合は中断
                 if not downloaded_files:
-                    raise DownloadError(f"最初のダウンロードに失敗しました: {e!s}")
+                    raise DownloadError(
+                        f"最初のダウンロードに失敗しました: {e!s}"
+                    ) from e
                 continue
 
         if not downloaded_files and links:
-            error_msg = "ダウンロードに成功したファイルがありません。全てのダウンロードが失敗しました。"
+            error_msg = (
+                "ダウンロードに成功したファイルがありません。"
+                "全てのダウンロードが失敗しました。"
+            )
             logger.error(
                 "ダウンロード処理が完全に失敗しました。ダウンロード試行数: %d",
                 len(links),

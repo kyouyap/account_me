@@ -133,11 +133,10 @@ def test_get_client_config_success(gmail_client):
 
 def test_get_client_config_missing_env(gmail_client):
     """環境変数が設定されていない場合にGmailApiErrorが発生することを確認する。"""
-    with patch.dict(os.environ, clear=True):
-        with pytest.raises(
-            GmailApiError, match="GMAIL_CREDENTIALS環境変数が設定されていません"
-        ):
-            gmail_client._get_client_config()
+    with patch.dict(os.environ, clear=True), pytest.raises(
+        GmailApiError, match="GMAIL_CREDENTIALS環境変数が設定されていません"
+    ):
+        gmail_client._get_client_config()
 
 
 def test_get_existing_credentials_success(gmail_client):
@@ -250,18 +249,14 @@ def test_create_gmail_service_with_valid_credentials(monkeypatch):
             "GMAIL_CREDENTIALS": json.dumps(client_config),
             "GMAIL_API_TOKEN": json.dumps(token_data),
         },
+    ), patch(
+        "googleapiclient.discovery.build", return_value=mock_service
+    ) as mock_build, patch.object(
+        Credentials, "from_authorized_user_info", return_value=mock_creds
     ):
-        with patch(
-            "googleapiclient.discovery.build", return_value=mock_service
-        ) as mock_build:
-            with patch.object(
-                Credentials, "from_authorized_user_info", return_value=mock_creds
-            ):
-                client = GmailClient()
-                mock_build.assert_called_once_with(
-                    "gmail", "v1", credentials=mock_creds
-                )
-                assert client.service is mock_service
+        client = GmailClient()
+        mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
+        assert client.service is mock_service
 
 
 def test_create_gmail_service_with_expired_credentials(monkeypatch):
@@ -288,23 +283,18 @@ def test_create_gmail_service_with_expired_credentials(monkeypatch):
             "GMAIL_CREDENTIALS": json.dumps(client_config),
             "GMAIL_API_TOKEN": json.dumps(token_data),
         },
-    ):
-        with patch(
-            "googleapiclient.discovery.build", return_value=mock_service
-        ) as mock_build:
-            with patch.object(
-                Credentials, "from_authorized_user_info", return_value=mock_creds
-            ):
-                with patch("scraper.gmail_client.update_secret") as mock_update:
-                    client = GmailClient()
-                    mock_build.assert_called_once_with(
-                        "gmail", "v1", credentials=mock_creds
-                    )
-                    mock_creds.refresh.assert_called_once()
-                    mock_update.assert_called_once_with(
-                        "gmail-api-token", '{"token": "refreshed_token"}'
-                    )
-                    assert client.service is mock_service
+    ), patch(
+        "googleapiclient.discovery.build", return_value=mock_service
+    ) as mock_build, patch.object(
+        Credentials, "from_authorized_user_info", return_value=mock_creds
+    ), patch("scraper.gmail_client.update_secret") as mock_update:
+        client = GmailClient()
+        mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
+        mock_creds.refresh.assert_called_once()
+        mock_update.assert_called_once_with(
+            "gmail-api-token", '{"token": "refreshed_token"}'
+        )
+        assert client.service is mock_service
 
 
 def test_create_gmail_service_create_new_credentials(monkeypatch):
@@ -322,24 +312,20 @@ def test_create_gmail_service_create_new_credentials(monkeypatch):
         {
             "GMAIL_CREDENTIALS": json.dumps(client_config),
         },
-    ):
-        with patch(
-            "googleapiclient.discovery.build", return_value=mock_service
-        ) as mock_build:
-            with patch(
-                "google_auth_oauthlib.flow.InstalledAppFlow.from_client_config"
-            ) as mock_flow:
-                mock_flow.return_value.run_local_server.return_value = mock_creds
-                with patch("scraper.gmail_client.update_secret") as mock_update:
-                    client = GmailClient()
-                    mock_build.assert_called_once_with(
-                        "gmail", "v1", credentials=mock_creds
-                    )
-                    mock_flow.assert_called_once_with(client_config, scopes=SCOPES)
-                    mock_update.assert_called_once_with(
-                        "gmail-api-token", '{"token": "new_token"}'
-                    )
-                    assert client.service is mock_service
+    ), patch(
+        "googleapiclient.discovery.build", return_value=mock_service
+    ) as mock_build, patch(
+        "google_auth_oauthlib.flow.InstalledAppFlow.from_client_config"
+    ) as mock_flow:
+        mock_flow.return_value.run_local_server.return_value = mock_creds
+        with patch("scraper.gmail_client.update_secret") as mock_update:
+            client = GmailClient()
+            mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
+            mock_flow.assert_called_once_with(client_config, scopes=SCOPES)
+            mock_update.assert_called_once_with(
+                "gmail-api-token", '{"token": "new_token"}'
+            )
+            assert client.service is mock_service
 
 
 def test_create_gmail_service_error_build(monkeypatch):
@@ -362,14 +348,12 @@ def test_create_gmail_service_error_build(monkeypatch):
             "GMAIL_CREDENTIALS": json.dumps(client_config),
             "GMAIL_API_TOKEN": json.dumps(token_data),
         },
+    ), patch("googleapiclient.discovery.build") as mock_build, patch.object(
+        Credentials, "from_authorized_user_info", return_value=mock_creds
     ):
-        with patch("googleapiclient.discovery.build") as mock_build:
-            with patch.object(
-                Credentials, "from_authorized_user_info", return_value=mock_creds
-            ):
-                mock_build.side_effect = Exception("Build error")
-                with pytest.raises(GmailApiError, match="Gmailサービスの作成に失敗"):
-                    GmailClient()
+        mock_build.side_effect = Exception("Build error")
+        with pytest.raises(GmailApiError, match="Gmailサービスの作成に失敗"):
+            GmailClient()
 
 
 def test_extract_email_body_singlepart_success(gmail_client, singlepart_message):
@@ -441,7 +425,8 @@ def test_expiry_time_invalid_format(gmail_client):
                     "mimeType": "text/plain",
                     "body": {
                         "data": base64.b64encode(
-                            b"Your verification code is: 123456\nThis code is valid for 10 mins (invalid date)"
+                            b"Your verification code is: 123456\n"
+                            b"This code is valid for 10 mins (invalid date)"
                         ).decode()
                     },
                 }
@@ -464,7 +449,10 @@ def test_get_verification_email_ids_success(gmail_client):
     # APIの呼び出しパラメータを確認
     mock_service.users().messages().list.assert_called_with(
         userId="me",
-        q='from:do_not_reply@moneyforward.com subject:"Money Forward ID Additional Authentication via Email"',
+        q=(
+            "from:do_not_reply@moneyforward.com "
+            'subject:"Money Forward ID Additional Authentication via Email"'
+        ),
         maxResults=5,
     )
 
@@ -617,13 +605,17 @@ def test_extract_verification_code_invalid_expiry(gmail_client):
                     "mimeType": "text/plain",
                     "body": {
                         "data": base64.b64encode(
-                            b"Your verification code is: 123456\nThis code is valid for 10 mins (invalid date)"
+                            b"Your verification code is: 123456\n"
+                            b"This code is valid for 10 mins (invalid date)"
                         ).decode()
                     },
                 }
             ]
         }
     }
-    expected_error = "メッセージの解析に失敗: time data 'invalid date' does not match format '%B %d, %Y %H:%M:%S'"
+    expected_error = (
+        "メッセージの解析に失敗: time data 'invalid date' does not match format "
+        "'%B %d, %Y %H:%M:%S'"
+    )
     with pytest.raises(VerificationCodeError, match=expected_error):
         gmail_client._parse_message(message)

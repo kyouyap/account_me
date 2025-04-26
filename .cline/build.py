@@ -2,8 +2,10 @@
 """プロンプトファイルとカスタムモード定義を処理するスクリプト
 
 このスクリプトは以下の処理を行います：
-1. rules/ ディレクトリ内の Markdown プロンプトファイルを結合して .clinerules ファイルを生成
-2. roomodes/ ディレクトリ内のカスタムモード定義（Markdown）を読み込んで .roomodes ファイルを生成
+1. rules/ ディレクトリ内の Markdown プロンプトファイルを結合して
+   .clinerules ファイルを生成
+2. roomodes/ ディレクトリ内のカスタムモード定義（Markdown）を読み込んで
+   .roomodes ファイルを生成
 3. カスタムモードの一覧を .clinerules ファイルの末尾に追加
 
 生成されるファイル:
@@ -62,7 +64,7 @@ def parse_front_matter(content: str) -> tuple[dict[str, Any], str]:
 
 def main() -> None:
     """メイン処理"""
-    roomodes = {"customModes": []}
+    roomodes: dict[str, list[dict[str, Any]]] = {"customModes": []}
 
     # roomodesの処理
     if ROO_MODES_DIR.exists():

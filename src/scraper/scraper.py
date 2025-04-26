@@ -116,7 +116,8 @@ class MoneyForwardScraper:
             file_path: 読み込むCSVファイルのパス。
 
         Returns:
-            pd.DataFrame | None: 読み込んだデータフレーム。読み込みに失敗した場合はNone。
+            pd.DataFrame | None:
+                読み込んだデータフレーム。読み込みに失敗した場合はNone。
 
         """
         # ファイルサイズチェック
@@ -163,7 +164,8 @@ class MoneyForwardScraper:
 
         if decode_errors:
             logger.error(
-                "CSVファイル '%s' を読み込めませんでした。対応していないエンコーディングの可能性があります。\n詳細:\n%s",
+                "CSVファイル '%s' を読み込めませんでした。"
+                "対応していないエンコーディングの可能性があります。\n詳細:\n%s",
                 file_path,
                 "\n".join(decode_errors),
             )
@@ -323,7 +325,10 @@ class MoneyForwardScraper:
                     )
                 except Exception as e:
                     logger.error("ブラウザ操作中にエラーが発生しました:", exc_info=True)
-                    error_message = f"スクレイピングに失敗しました。詳細:\n{e.__class__.__name__}: {e!s}"
+                    error_message = (
+                        f"スクレイピングに失敗しました。詳細:\n"
+                        f"{e.__class__.__name__}: {e!s}"
+                    )
                     raise MoneyForwardError(error_message) from e
 
             self.file_downloader.clean_download_dir()
@@ -335,6 +340,6 @@ class MoneyForwardScraper:
             logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
             error_message = (
-                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {e!s}"
+                "予期せぬエラーが発生しました。詳細:\n" f"{e.__class__.__name__}: {e!s}"
             )
             raise MoneyForwardError(error_message) from e

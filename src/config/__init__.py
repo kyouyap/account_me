@@ -1,7 +1,7 @@
 """設定管理モジュール。"""
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -59,11 +59,11 @@ class Config:
                         f"設定ファイルの形式が正しくありません: {settings_path}"
                     )
         except FileNotFoundError as e:
-            raise ConfigurationError(str(e))
+            raise ConfigurationError(str(e)) from e
         except (yaml.YAMLError, OSError) as e:
             raise ConfigurationError(
                 f"設定ファイルの読み込みに失敗: {settings_path}: {e}"
-            )
+            ) from e
 
     def _load_env(self) -> None:
         """環境変数を読み込む。"""
@@ -86,8 +86,10 @@ class Config:
         for key in keys:
             try:
                 value = value[key]
-            except (KeyError, TypeError):
-                raise ConfigurationError(f"設定が見つかりません: {'.'.join(keys)}")
+            except (KeyError, TypeError) as e:
+                raise ConfigurationError(
+                    f"設定が見つかりません: {'.'.join(keys)}"
+                ) from e
         return value
 
     @property
