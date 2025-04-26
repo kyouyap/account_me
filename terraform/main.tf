@@ -94,6 +94,30 @@ resource "google_bigquery_dataset" "moneyforward" {
   location      = var.region
 }
 
+# BigQueryテーブル（家計簿データ）
+resource "google_bigquery_table" "household_data" {
+  dataset_id = google_bigquery_dataset.moneyforward.dataset_id
+  table_id   = "household_data"
+  
+  schema = file("${path.module}/schema/household_data.json")
+  
+  clustering = ["date", "major_category", "sub_category"]
+
+  deletion_protection = true
+}
+
+# BigQueryテーブル（資産データ）
+resource "google_bigquery_table" "assets_data" {
+  dataset_id = google_bigquery_dataset.moneyforward.dataset_id
+  table_id   = "assets_data"
+  
+  schema = file("${path.module}/schema/assets_data.json")
+  
+  clustering = ["date"]
+
+  deletion_protection = true
+}
+
 # Spreadsheet Credential Secret
 resource "google_secret_manager_secret" "spreadsheet_credential" {
   secret_id = "spreadsheet-credential"
