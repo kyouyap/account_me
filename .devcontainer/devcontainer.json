@@ -22,7 +22,8 @@
                 "saoudrizwan.claude-dev",
                 "donjayamanne.python-extension-pack",
                 "4ops.terraform",
-                "ms-python.mypy-type-checker"
+                "ms-python.mypy-type-checker",
+                "bierner.markdown-mermaid"
             ]
         },
         "settings": {
