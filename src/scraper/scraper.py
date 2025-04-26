@@ -29,11 +29,11 @@ import os
 from pathlib import Path
 
 import pandas as pd
-
-from config.settings import settings
 from exceptions.custom_exceptions import MoneyForwardError
 from scraper.browser import BrowserManager
 from scraper.downloader import FileDownloader
+
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +340,6 @@ class MoneyForwardScraper:
             logger.error("スクレイピング中にエラーが発生しました:", exc_info=True)
             self.file_downloader.clean_download_dir()
             error_message = (
-                "予期せぬエラーが発生しました。詳細:\n" f"{e.__class__.__name__}: {e!s}"
+                f"予期せぬエラーが発生しました。詳細:\n{e.__class__.__name__}: {e!s}"
             )
             raise MoneyForwardError(error_message) from e

@@ -10,7 +10,6 @@ import pytest
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
-
 from scraper.gmail_client import (
     SCOPES,
     GmailApiError,
@@ -133,8 +132,11 @@ def test_get_client_config_success(gmail_client):
 
 def test_get_client_config_missing_env(gmail_client):
     """環境変数が設定されていない場合にGmailApiErrorが発生することを確認する。"""
-    with patch.dict(os.environ, clear=True), pytest.raises(
-        GmailApiError, match="GMAIL_CREDENTIALS環境変数が設定されていません"
+    with (
+        patch.dict(os.environ, clear=True),
+        pytest.raises(
+            GmailApiError, match="GMAIL_CREDENTIALS環境変数が設定されていません"
+        ),
     ):
         gmail_client._get_client_config()
 
@@ -243,16 +245,18 @@ def test_create_gmail_service_with_valid_credentials(monkeypatch):
         "client_id": "test_client_id",
         "client_secret": "test_client_secret",
     }
-    with patch.dict(
-        os.environ,
-        {
-            "GMAIL_CREDENTIALS": json.dumps(client_config),
-            "GMAIL_API_TOKEN": json.dumps(token_data),
-        },
-    ), patch(
-        "googleapiclient.discovery.build", return_value=mock_service
-    ) as mock_build, patch.object(
-        Credentials, "from_authorized_user_info", return_value=mock_creds
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "GMAIL_CREDENTIALS": json.dumps(client_config),
+                "GMAIL_API_TOKEN": json.dumps(token_data),
+            },
+        ),
+        patch(
+            "googleapiclient.discovery.build", return_value=mock_service
+        ) as mock_build,
+        patch.object(Credentials, "from_authorized_user_info", return_value=mock_creds),
     ):
         client = GmailClient()
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
@@ -277,17 +281,20 @@ def test_create_gmail_service_with_expired_credentials(monkeypatch):
         "client_id": "test_client_id",
         "client_secret": "test_client_secret",
     }
-    with patch.dict(
-        os.environ,
-        {
-            "GMAIL_CREDENTIALS": json.dumps(client_config),
-            "GMAIL_API_TOKEN": json.dumps(token_data),
-        },
-    ), patch(
-        "googleapiclient.discovery.build", return_value=mock_service
-    ) as mock_build, patch.object(
-        Credentials, "from_authorized_user_info", return_value=mock_creds
-    ), patch("scraper.gmail_client.update_secret") as mock_update:
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "GMAIL_CREDENTIALS": json.dumps(client_config),
+                "GMAIL_API_TOKEN": json.dumps(token_data),
+            },
+        ),
+        patch(
+            "googleapiclient.discovery.build", return_value=mock_service
+        ) as mock_build,
+        patch.object(Credentials, "from_authorized_user_info", return_value=mock_creds),
+        patch("scraper.gmail_client.update_secret") as mock_update,
+    ):
         client = GmailClient()
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
         mock_creds.refresh.assert_called_once()
@@ -307,16 +314,20 @@ def test_create_gmail_service_create_new_credentials(monkeypatch):
 
     # 環境変数の設定
     client_config = {"web": {"client_id": "test_id", "client_secret": "test_secret"}}
-    with patch.dict(
-        os.environ,
-        {
-            "GMAIL_CREDENTIALS": json.dumps(client_config),
-        },
-    ), patch(
-        "googleapiclient.discovery.build", return_value=mock_service
-    ) as mock_build, patch(
-        "google_auth_oauthlib.flow.InstalledAppFlow.from_client_config"
-    ) as mock_flow:
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "GMAIL_CREDENTIALS": json.dumps(client_config),
+            },
+        ),
+        patch(
+            "googleapiclient.discovery.build", return_value=mock_service
+        ) as mock_build,
+        patch(
+            "google_auth_oauthlib.flow.InstalledAppFlow.from_client_config"
+        ) as mock_flow,
+    ):
         mock_flow.return_value.run_local_server.return_value = mock_creds
         with patch("scraper.gmail_client.update_secret") as mock_update:
             client = GmailClient()
@@ -342,14 +353,16 @@ def test_create_gmail_service_error_build(monkeypatch):
     mock_creds = MagicMock(spec=Credentials)
     mock_creds.valid = True
 
-    with patch.dict(
-        os.environ,
-        {
-            "GMAIL_CREDENTIALS": json.dumps(client_config),
-            "GMAIL_API_TOKEN": json.dumps(token_data),
-        },
-    ), patch("googleapiclient.discovery.build") as mock_build, patch.object(
-        Credentials, "from_authorized_user_info", return_value=mock_creds
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "GMAIL_CREDENTIALS": json.dumps(client_config),
+                "GMAIL_API_TOKEN": json.dumps(token_data),
+            },
+        ),
+        patch("googleapiclient.discovery.build") as mock_build,
+        patch.object(Credentials, "from_authorized_user_info", return_value=mock_creds),
     ):
         mock_build.side_effect = Exception("Build error")
         with pytest.raises(GmailApiError, match="Gmailサービスの作成に失敗"):
