@@ -13,7 +13,6 @@ from selenium.webdriver.common.by import By
 
 from exceptions.custom_exceptions import (
     AuthenticationError,
-    GmailApiError,
     ScrapingError,
     VerificationCodeError,
 )
@@ -31,7 +30,7 @@ def browser_manager():
 def mock_gmail_client():
     """GmailClientのモックを提供するフィクスチャ。"""
     mock = MagicMock(spec=GmailClient)
-    mock.get_latest_verification_email_id.return_value = "test_email_id"
+    mock.get_verification_code.return_value = "123456"
     return mock
 
 
@@ -272,14 +271,8 @@ def test_login_success_with_2fa(
     browser_manager, mock_browser_setup, mock_form_elements
 ):
     """2段階認証を含むログイン成功のテスト。"""
-    mock_setup = mock_browser_setup
-    mock_setup["gmail"].get_latest_verification_email_id.side_effect = [
-        "old_email_id",
-        "new_email_id",
-    ]
-    mock_setup["gmail"].get_verification_code_by_id.return_value = "123456"
-
     mock_success_element = MagicMock()
+
     with patch.object(browser_manager, "wait_and_find_element") as mock_find:
         mock_find.side_effect = [
             mock_form_elements["email"],
@@ -288,7 +281,9 @@ def test_login_success_with_2fa(
             mock_success_element,
         ]
 
-        browser_manager.login("test@example.com", "password123")
+        # メール送信後の待機と認証コード取得をテスト
+        with patch("time.sleep"):
+            browser_manager.login("test@example.com", "password123")
 
         # 各要素への操作を確認
         mock_form_elements["email"].send_keys.assert_called_with("test@example.com")
@@ -300,68 +295,25 @@ def test_login_success_with_2fa(
 
 
 def test_login_2fa_code_expired(
-    browser_manager, mock_browser_setup, mock_form_elements, test_settings
+    browser_manager, mock_browser_setup, mock_form_elements
 ):
     """2段階認証コードの有効期限切れのテスト。"""
     mock_setup = mock_browser_setup
-    mock_setup["gmail"].get_latest_verification_email_id.return_value = "test_email_id"
-    mock_setup["gmail"].get_verification_code_by_id.side_effect = VerificationCodeError(
-        "認証コードの有効期限が切れています"
+    mock_setup["gmail"].get_verification_code.side_effect = VerificationCodeError(
+        "有効な認証コードが見つかりませんでした"
     )
 
-    with (
-        patch.object(browser_manager, "wait_and_find_element") as mock_find,
-        patch.object(browser_manager, "wait_for_new_verification_email") as mock_wait,
-    ):
+    with patch.object(browser_manager, "wait_and_find_element") as mock_find:
         mock_find.side_effect = [
             mock_form_elements["email"],
             mock_form_elements["password"],
             mock_form_elements["code"],
         ]
 
-        # wait_for_new_verification_emailが呼ばれると例外を発生させる
-        mock_wait.side_effect = VerificationCodeError("認証メール待機がタイムアウト")
-
-        with pytest.raises(AuthenticationError) as exc_info:
-            browser_manager.login("test@example.com", "password123")
-        assert "2段階認証に失敗しました" in str(exc_info.value)
-
-
-def test_wait_for_new_verification_email_success(browser_manager, mock_gmail_client):
-    """新しい認証メール待機の成功テスト。"""
-    mock_gmail_client.get_latest_verification_email_id.side_effect = [
-        "old_id",
-        "new_id",
-    ]
-
-    result = browser_manager.wait_for_new_verification_email(
-        mock_gmail_client, "old_id"
-    )
-    assert result == "new_id"
-    assert mock_gmail_client.get_latest_verification_email_id.call_count == 2
-
-
-def test_wait_for_new_verification_email_timeout(browser_manager, mock_gmail_client):
-    """認証メール待機のタイムアウトテスト。"""
-    with patch("time.sleep", return_value=None):
-        mock_gmail_client.get_latest_verification_email_id.return_value = "old_id"
-
-        with pytest.raises(VerificationCodeError) as exc_info:
-            browser_manager.wait_for_new_verification_email(mock_gmail_client, "old_id")
-        assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
-
-
-def test_wait_for_new_verification_email_api_error(browser_manager):
-    with patch("time.sleep", return_value=None):
-        """Gmail APIエラー時のテスト。"""
-        mock_gmail_client = MagicMock(spec=GmailClient)
-        mock_gmail_client.get_latest_verification_email_id.side_effect = GmailApiError(
-            "API Error"
-        )
-
-        with pytest.raises(VerificationCodeError) as exc_info:
-            browser_manager.wait_for_new_verification_email(mock_gmail_client)
-        assert "新しい認証メールの到着待機がタイムアウトしました" in str(exc_info.value)
+        with patch("time.sleep"):
+            with pytest.raises(AuthenticationError) as exc_info:
+                browser_manager.login("test@example.com", "password123")
+            assert "認証コードの取得に失敗" in str(exc_info.value)
 
 
 def test_login_failure(browser_manager, mock_browser_setup):

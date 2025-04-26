@@ -17,10 +17,7 @@ def setup_env():
     original_value = os.environ.get("APP_BASE_DIR")
     os.environ["APP_BASE_DIR"] = "/app"
     yield
-    if original_value is None:
-        del os.environ["APP_BASE_DIR"]
-    else:
-        os.environ["APP_BASE_DIR"] = original_value
+    os.environ["APP_BASE_DIR"] = original_value
 
 
 @pytest.fixture
