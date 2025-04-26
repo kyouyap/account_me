@@ -1,4 +1,16 @@
-"""MoneyForwardスクレイピングメインモジュール。"""
+"""MoneyForwardスクレイピングのメインモジュール。
+
+このモジュールは、MoneyForwardからの家計データスクレイピングとスプレッドシートへの同期を制御します。
+
+主な機能:
+    - MoneyForwardからの家計データ自動取得
+    - 取得したデータのスプレッドシートへの同期
+    - ロギングによる実行状態の監視
+
+Note:
+    実行には適切な認証情報とアクセス権限が必要です。
+    設定は config/ ディレクトリ下の各設定ファイルで管理されています。
+"""
 
 import logging
 from config.logging_config import setup_logging
@@ -13,7 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 def run_scraping() -> None:
-    """スクレイピング処理を実行する。"""
+    """MoneyForwardのスクレイピングとスプレッドシート同期を実行します。
+
+    この関数は以下の処理を順次実行します：
+        1. MoneyForwardへのログインとデータ取得
+        2. 取得したデータのスプレッドシートへの同期
+
+    Returns:
+        None
+
+    Raises:
+        MoneyForwardError: スクレイピング処理で発生したエラー
+        Exception: その他の予期せぬエラー
+    """
     try:
         # スクレイピングの実行
         logger.info("スクレイピングを開始します。")

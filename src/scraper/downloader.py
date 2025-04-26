@@ -1,4 +1,19 @@
-"""ファイルダウンロードモジュール。"""
+"""MoneyForwardからのファイルダウンロードを管理するモジュール。
+
+このモジュールは、MoneyForwardからのCSVファイルダウンロードを管理し、
+ダウンロードディレクトリの操作やファイルの保存を制御します。urllib3を使用した
+HTTPダウンロードとSeleniumを組み合わせて安定したファイル取得を実現します。
+
+主な機能:
+    - ダウンロードディレクトリの管理（作成、クリーンアップ）
+    - HTTPSを使用したファイルダウンロード
+    - 複数リンクからの一括ダウンロード
+    - ダウンロード状態の監視と再試行
+
+Note:
+    - ダウンロードには適切なセッションクッキーが必要です
+    - 一時ファイルは自動的にクリーンアップされます
+"""
 
 import logging
 import os
@@ -18,7 +33,23 @@ logger = logging.getLogger(__name__)
 
 
 class FileDownloader:
-    """ファイルダウンロードを管理するクラス。"""
+    """ファイルダウンロードを管理するクラス。
+
+    このクラスは、MoneyForwardからのファイルダウンロードを管理し、
+    ダウンロードディレクトリの操作やファイルの保存を制御します。
+    urllib3を使用したHTTPダウンロードとSeleniumを組み合わせて実装されています。
+
+    Attributes:
+        download_dir (Path): ダウンロードファイルの保存先ディレクトリ
+        http (urllib3.PoolManager): HTTPリクエスト用のコネクションプール
+
+    使用例:
+        ```python
+        downloader = FileDownloader(Path("/path/to/downloads"))
+        downloader.prepare_download_dir()
+        downloaded_files = downloader.download_from_links(driver, links)
+        ```
+    """
 
     def __init__(self, download_dir: Path) -> None:
         """
@@ -132,18 +163,35 @@ class FileDownloader:
     def download_from_links(
         self, driver: WebDriver, links: List[str], base_name: str = "download"
     ) -> List[Path]:
-        """複数のリンクからファイルをダウンロード。
+        """複数のリンクからファイルをダウンロードします。
+
+        MoneyForwardの口座情報ページと履歴ページの両方に対応し、
+        各ページタイプに応じた適切なダウンロード処理を実行します。
+        履歴ページの場合は指定された月数分のデータを取得します。
+
+        処理の流れ:
+            1. 各リンクの種類（履歴/口座）を判定
+            2. 履歴ページの場合:
+                - CSVダウンロードURLに直接アクセス
+            3. 口座ページの場合:
+                - ページにアクセスして「今日」ボタンをクリック
+                - 指定月数分の履歴をダウンロード
+                - 各月で「前月」ボタンをクリックして移動
+            4. ダウンロードしたファイルを保存
 
         Args:
-            driver: SeleniumのWebDriverインスタンス。
-            links: ダウンロードするファイルのURLリスト。
-            base_name: 出力ファイルのベース名。
+            driver: Seleniumブラウザのインスタンス
+            links: ダウンロード対象のURLリスト
+            base_name: 保存するファイルのベース名（デフォルト: "download"）
 
         Returns:
-            List[Path]: ダウンロードしたファイルのパスリスト。
+            List[Path]: ダウンロードに成功したファイルのパスリスト
 
         Raises:
-            DownloadError: ダウンロードに失敗した場合。
+            DownloadError: 以下の場合に発生:
+                - 全てのダウンロードが失敗
+                - 最初のダウンロードが失敗
+                - ファイルの保存に失敗
         """
         downloaded_files = []
         for i, link in enumerate(links):

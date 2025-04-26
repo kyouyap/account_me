@@ -1,4 +1,18 @@
-"""シークレット管理モジュール。"""
+"""GCP Secret Managerを使用したシークレット管理モジュール。
+
+このモジュールは、アプリケーションで使用する機密情報をGoogle Cloud Platform (GCP) Secret Manager
+を通じて安全に管理します。
+
+主な機能:
+    - MoneyForward認証情報の取得
+    - Google Spreadsheet APIの認証情報の取得
+    - Gmail APIの認証情報の取得
+    - シークレットの環境変数への設定
+    - シークレットの更新
+
+Note:
+    実行には適切なGCPプロジェクト設定とSecret Managerへのアクセス権限が必要です。
+"""
 
 from google.cloud import secretmanager
 import os
@@ -14,13 +28,17 @@ _project_number: Optional[str] = None
 
 
 def get_project_number() -> str:
-    """GCPプロジェクト番号を取得。
+    """GCPプロジェクト番号を取得します。
+
+    gcloudコマンドを使用してプロジェクトIDを取得し、そこからプロジェクト番号を
+    取得します。結果はキャッシュされ、2回目以降の呼び出しでは保存された値が
+    返されます。
 
     Returns:
         str: GCPプロジェクト番号
 
     Raises:
-        ConfigurationError: プロジェクト番号の取得に失敗した場合
+        ConfigurationError: プロジェクトIDまたはプロジェクト番号の取得に失敗した場合
     """
     global _project_number
     if _project_number is None:
@@ -58,10 +76,18 @@ def get_project_number() -> str:
 
 
 def get_secrets() -> None:
-    """Secret Managerから必要な環境変数を設定。
+    """Secret Managerから必要なシークレットを取得し、環境変数として設定します。
+
+    以下のシークレットを環境変数として設定します:
+        - EMAIL: MoneyForwardログイン用メールアドレス
+        - PASSWORD: MoneyForwardログインパスワード
+        - SPREADSHEET_KEY: 同期先のスプレッドシートキー
+        - GMAIL_CREDENTIALS: Gmail API用クライアント認証情報
+        - GMAIL_API_TOKEN: Gmail APIアクセストークン
+        - SPREADSHEET_CREDENTIAL_JSON: Spreadsheet API用サービスアカウント認証情報
 
     Raises:
-        ConfigurationError: シークレットの取得に失敗した場合
+        ConfigurationError: シークレットの取得または環境変数の設定に失敗した場合
     """
     try:
         client = secretmanager.SecretManagerServiceClient()
@@ -93,14 +119,18 @@ def get_secrets() -> None:
 
 
 def update_secret(secret_name: str, secret_value: str) -> None:
-    """Secret Managerのシークレットを更新。
+    """Secret Managerの特定のシークレットを更新します。
 
     Args:
-        secret_name: シークレット名
-        secret_value: 新しい値
+        secret_name: 更新対象のシークレット名
+            (例: "mf-email", "spreadsheet-key" など)
+        secret_value: シークレットの新しい値
 
     Raises:
         ConfigurationError: シークレットの更新に失敗した場合
+            - シークレットが存在しない
+            - 更新権限がない
+            - その他のAPI関連エラー
     """
     try:
         client = secretmanager.SecretManagerServiceClient()

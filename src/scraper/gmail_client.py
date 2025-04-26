@@ -1,4 +1,28 @@
-"""Gmail APIクライアントモジュール。"""
+"""Gmail APIを使用した認証メール処理モジュール。
+
+このモジュールは、MoneyForwardの2段階認証メールをGmail APIを通じて処理します。
+認証メールの検索、認証コードの抽出、有効期限の確認などの機能を提供します。
+
+定数:
+    - CODE_PATTERN: 認証コードを抽出するための正規表現パターン
+    - EXPIRY_PATTERN: 有効期限を抽出するための正規表現パターン
+
+主な機能:
+    - Gmail APIの認証と接続管理
+    - 認証メールの検索と取得
+    - 認証コードの抽出
+    - 認証コードの有効期限確認
+    - APIトークンの自動更新と保存
+
+使用するスコープ:
+    - gmail.readonly: メールの読み取り
+    - gmail.modify: メールの変更（既読マークなど）
+
+Note:
+    - 適切なGmail API認証情報が必要です
+    - Secret Managerでトークンを管理します
+    - 日本時間（UTC+9）で有効期限を処理します
+"""
 
 import base64
 import datetime
@@ -25,9 +49,20 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
 ]
 
+# プリコンパイルされた正規表現パターン
+CODE_PATTERN = re.compile(r"\d{6}")
+EXPIRY_PATTERN = re.compile(r"valid for \d+ mins \((.*?)\)")
+
 
 class AuthSettings(TypedDict):
-    """認証設定の型定義。"""
+    """認証設定を定義する型。
+
+    Attributes:
+        sender (str): 認証メールの送信者アドレス
+        subject (str): 認証メールの件名
+        code_pattern (str): 認証コードを抽出する正規表現パターン
+        code_timeout_minutes (int): 認証コードの有効期限（分）
+    """
 
     sender: str
     subject: str
@@ -36,7 +71,23 @@ class AuthSettings(TypedDict):
 
 
 class GmailClient:
-    """Gmail APIを使用してメールを操作するクラス。"""
+    """Gmail APIを使用して認証メールを処理するクラス。
+
+    このクラスは、MoneyForwardからの2段階認証メールを処理するための
+    機能を提供します。Gmail APIを使用してメールを検索し、認証コードを
+    抽出します。
+
+    Attributes:
+        auth_settings (AuthSettings): 認証メールの検索と解析に関する設定
+        service: Gmail APIサービスのインスタンス
+
+    使用例:
+        ```python
+        client = GmailClient()
+        code = client.get_verification_code()
+        print(f"認証コード: {code}")
+        ```
+    """
 
     auth_settings: AuthSettings
 
@@ -148,12 +199,9 @@ class GmailClient:
 
             logger.info("メール本文の取得が完了")
 
-            # 認証コードを抽出
-            logger.info(
-                "認証コードのパターンマッチを試行: %s",
-                self.auth_settings["code_pattern"],
-            )
-            code_match = re.search(self.auth_settings["code_pattern"], body)
+            # 認証コードを抽出（プリコンパイルされたパターンを使用）
+            logger.info("認証コードのパターンマッチを試行")
+            code_match = CODE_PATTERN.search(body)
             if not code_match:
                 logger.error("認証コードのパターンが本文中に見つかりません")
                 logger.error("メール本文: %s", body)
@@ -161,10 +209,9 @@ class GmailClient:
             code = code_match.group(0)
             logger.info("認証コードを抽出しました: %s", code)
 
-            # 有効期限を抽出
+            # 有効期限を抽出（プリコンパイルされたパターンを使用）
             logger.info("有効期限のパターンマッチを試行")
-            expiry_pattern = r"valid for \d+ mins \((.*?)\)"
-            expiry_match = re.search(expiry_pattern, body)
+            expiry_match = EXPIRY_PATTERN.search(body)
             if not expiry_match:
                 logger.error("有効期限のパターンが本文中に見つかりません")
                 logger.error("メール本文: %s", body)
@@ -282,76 +329,17 @@ class GmailClient:
             raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
 
     def get_verification_code(self) -> str:
-        """最新の認証コードを取得。
+        """最新の認証メールから認証コードを取得します。
 
         Returns:
             str: 6桁の認証コード
 
         Raises:
-            VerificationCodeError: 認証コードの取得に失敗した場合
+            VerificationCodeError: コードの取得に失敗した場合
+            GmailApiError: Gmail APIのリクエストに失敗した場合
         """
-        try:
-            # 認証メールを検索
-            query = (
-                f"from:{self.auth_settings['sender']} "
-                f'subject:"{self.auth_settings["subject"]}"'
-            )
-
-            logger.info("メール検索クエリ: %s", query)
-
-            logger.info("Gmail APIでメールを検索")
-            result = (
-                self.service.users()
-                .messages()
-                .list(userId="me", q=query, maxResults=1)
-                .execute()
-            )
-            logger.info("メール検索が完了")
-
-            if result is None:
-                logger.error("メール検索結果がNoneでした")
-                raise VerificationCodeError("認証メールが見つかりません")
-
-            messages = result.get("messages", [])
-            logger.info("検索結果のメール数: %d", len(messages))
-            if not messages:
-                logger.error("認証メールが見つかりませんでした")
-                raise VerificationCodeError("認証メールが見つかりません")
-
-            # メッセージの詳細を取得
-            msg_id = messages[0]["id"]
-            logger.info("最新のメールID: %s を取得します", msg_id)
-            message = (
-                self.service.users()
-                .messages()
-                .get(userId="me", id=msg_id, format="full")
-                .execute()
-            )
-            logger.info("メールの取得に成功しました")
-
-            if message is None:
-                logger.error("メール本文の取得結果がNoneでした")
-                raise VerificationCodeError("メッセージの解析に失敗")
-
-            # コードと有効期限を抽出
-            logger.info("メールの内容を解析します")
-            code, expiry = self._parse_message(message)
-            logger.info("認証コード: %s, 有効期限: %s を抽出しました", code, expiry)
-
-            # 有効期限チェック
-            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
-            logger.info("現在時刻: %s", now)
-            if now > expiry:
-                raise VerificationCodeError("認証コードの有効期限が切れています")
-
-            logger.info("認証コードの取得に成功しました")
-            return code
-
-        except (HttpError, socket.timeout) as e:
-            logger.error("Gmail APIのリクエストに失敗: %s", e)
-            raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
-        except VerificationCodeError:
-            raise
-        except Exception as e:
-            logger.error("認証コードの取得に失敗: %s", e)
-            raise GmailApiError(f"Gmail APIのリクエストに失敗: {e}") from e
+        logger.info("最新の認証メールからコードを取得開始")
+        msg_id = self.get_latest_verification_email_id()
+        if not msg_id:
+            raise VerificationCodeError("認証メールが見つかりません")
+        return self.get_verification_code_by_id(msg_id)
