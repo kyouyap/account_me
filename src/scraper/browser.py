@@ -15,13 +15,14 @@ Note:
     - ChromeDriverのパスが正しく設定されている必要があります
     - Gmail APIを使用して2段階認証コードを取得します
     - 設定はsettingsモジュールから読み込まれます
+
 """
 
 import logging
 import os
 import time
 from dataclasses import dataclass
-from typing import List, Optional, TypeVar
+from typing import TypeVar
 
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -59,10 +60,11 @@ class ScrapingResult:
     Attributes:
         links (List[str]): 抽出されたダウンロードリンクのリスト
         cookies (List[dict]): セッションのクッキー情報
+
     """
 
-    links: List[str]
-    cookies: List[dict]
+    links: list[str]
+    cookies: list[dict]
 
 
 class BrowserManager:
@@ -82,6 +84,7 @@ class BrowserManager:
             browser.login(email, password)
             links = browser.get_links_for_download(target_url)
         ```
+
     """
 
     _by_mapping = {
@@ -97,7 +100,7 @@ class BrowserManager:
 
     def __init__(self) -> None:
         """ChromeDriverの設定を初期化。"""
-        self.driver: Optional[WebDriver] = None
+        self.driver: WebDriver | None = None
         self.timeout = settings.moneyforward.selenium.timeout
         self.retry_count = settings.moneyforward.selenium.retry_count
 
@@ -157,7 +160,9 @@ class BrowserManager:
         chrome_options.add_argument("--lang=ja")  # 日本語に設定
         chrome_options.add_argument("--window-size=1920x1080")
         chrome_options.add_argument(
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/58.0.3029.110 Safari/537.3"
         )
 
         # ダウンロード設定
@@ -184,7 +189,7 @@ class BrowserManager:
             raise ScrapingError(f"ブラウザの設定中に予期せぬエラーが発生: {e}") from e
 
     def wait_and_find_element(
-        self, by: By | str, value: str, timeout: Optional[int] = None
+        self, by: str, value: str, timeout: int | None = None
     ) -> WebElement:
         """要素が見つかるまで待機して取得。
 
@@ -198,6 +203,7 @@ class BrowserManager:
 
         Raises:
             ScrapingError: 要素が見つからない場合。
+
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")
@@ -206,7 +212,7 @@ class BrowserManager:
         logger.info("要素の検索を開始: %s=%s（タイムアウト: %d秒）", by, value, timeout)
         try:
             logger.debug("要素の待機を開始")
-            element: Optional[WebElement] = WebDriverWait(self.driver, timeout).until(
+            element: WebElement | None = WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((self._by_mapping[by], value))  # type: ignore
             )
             if not element:
@@ -236,6 +242,7 @@ class BrowserManager:
 
         Raises:
             ScrapingError: すべてのリトライが失敗した場合。
+
         """
         last_error = None
         for attempt in range(self.retry_count):
@@ -245,7 +252,8 @@ class BrowserManager:
                 last_error = e
                 if attempt < self.retry_count - 1:
                     logger.warning(
-                        "要素操作が失敗しました（リトライ %d/%d）: 要素 '%s=%s' に対する操作に失敗: %s",
+                        "要素操作が失敗しました（リトライ %d/%d）: "
+                        "要素 '%s=%s' に対する操作に失敗: %s",
                         attempt + 1,
                         self.retry_count,
                         args[0] if args else "unknown",
@@ -282,6 +290,7 @@ class BrowserManager:
                 - 2段階認証に失敗
                 - その他のログイン処理エラー
             ScrapingError: WebDriverが初期化されていない場合
+
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")
@@ -308,53 +317,9 @@ class BrowserManager:
             logger.info("パスワードフォームを送信")
             password_input.submit()
             logger.info("パスワード送信完了")
-            # Gmail APIクライアントを初期化
             logger.info("Gmail APIクライアントを初期化")
             gmail_client = GmailClient()
-
-            # 2段階認証の確認
-            try:
-                logger.info("2段階認証フォームの有無を確認")
-                try:
-                    code_input = self.wait_and_find_element(
-                        By.NAME, "email_otp", timeout=3
-                    )  # type: ignore
-                    logger.info("2段階認証が要求されました")
-                except ScrapingError:
-                    try:
-                        # 古い形式の2段階認証フォームを試行
-                        code_input = self.wait_and_find_element(
-                            By.NAME, "mfid_user[otp_attempt]", timeout=3
-                        )  # type: ignore
-                        logger.info("古い形式の2段階認証フォームが見つかりました")
-                    except ScrapingError as e:
-                        logger.error("2段階認証フォームが見つかりません: %s", e)
-                        if self.driver:
-                            logger.debug(
-                                "現在のページソース: %s", self.driver.page_source
-                            )
-                        raise
-
-                # 有効な認証コードを取得
-                logger.info("有効な認証コードを取得")
-                try:
-                    # メール受信とAPI反映のために少し待機（5秒）
-                    logger.info("メール受信待機中...")
-                    time.sleep(5)
-                    verification_code = gmail_client.get_verification_code()
-                    logger.info("認証コードを取得しました: %s", verification_code)
-                except (VerificationCodeError, GmailApiError) as e:
-                    logger.error("認証コードの取得に失敗: %s", e)
-                    raise AuthenticationError(f"認証コードの取得に失敗: {e}") from e
-
-                # 認証コードを入力して送信
-                logger.info("認証コードを入力: %s", verification_code)
-                code_input.send_keys(verification_code)
-                logger.info("認証コードフォームを送信")
-                code_input.submit()
-                logger.info("認証コードの送信完了")
-            except TimeoutException:
-                logger.info("2段階認証は要求されませんでした")
+            self._handle_two_factor_authentication(gmail_client)
 
             # デバッグのためにpage_sourceを保存
             logger.info("現在のページソースを保存")
@@ -387,7 +352,7 @@ class BrowserManager:
             raise AuthenticationError(f"ログインプロセスでエラーが発生: {e}") from e
         except (GmailApiError, VerificationCodeError) as e:
             logger.error("2段階認証中にエラーが発生: %s", e)
-            raise AuthenticationError(f"2段階認証に失敗しました: {e}") from e
+            raise AuthenticationError(f"認証コードの取得に失敗: {e}") from e
         except Exception as e:
             logger.error("予期せぬエラーが発生: %s", e)
             # デバッグのためにエラー時のページソースも保存
@@ -399,7 +364,27 @@ class BrowserManager:
                 f"ログイン処理中に予期せぬエラーが発生: {e}"
             ) from e
 
-    def get_links_for_download(self, page_url: str) -> List[str]:
+    def _handle_two_factor_authentication(self, gmail_client: GmailClient) -> None:
+        """二段階認証処理を行う。"""
+        try:
+            code_input = self.wait_and_find_element(By.NAME, "email_otp", timeout=3)  # type: ignore
+        except ScrapingError:
+            try:
+                code_input = self.wait_and_find_element(
+                    By.NAME, "mfid_user[otp_attempt]", timeout=3
+                )  # type: ignore
+            except ScrapingError:
+                return
+        logger.info("2段階認証が要求されました")
+        time.sleep(5)
+        verification_code = gmail_client.get_verification_code()
+        logger.info("認証コードを取得しました: %s", verification_code)
+        code_input.send_keys(verification_code)
+        logger.info("認証コードを入力")
+        code_input.submit()
+        logger.info("認証コードの送信完了")
+
+    def get_links_for_download(self, page_url: str) -> list[str]:
         """指定されたページからダウンロードリンクを抽出。
 
         Args:
@@ -410,6 +395,7 @@ class BrowserManager:
 
         Raises:
             ScrapingError: リンクの抽出に失敗した場合。
+
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")
@@ -422,17 +408,16 @@ class BrowserManager:
             if "/accounts" in page_url:
                 logger.info("アカウントページ用の処理を実行します")
                 return self._extract_links_from_accounts_page()
-            elif "/bs/history" in page_url:
+            if "/bs/history" in page_url:
                 logger.info("履歴ページ用の処理を実行します")
                 return self._extract_links_from_history_page()
-            else:
-                logger.warning("未知のページタイプです: %s", page_url)
-                raise ScrapingError(f"未知のページタイプです: {page_url}")
+            logger.warning("未知のページタイプです: %s", page_url)
+            raise ScrapingError(f"未知のページタイプです: {page_url}")
 
         except Exception as e:
             raise ScrapingError(f"ダウンロードリンクの抽出に失敗しました: {e}") from e
 
-    def _extract_links_from_accounts_page(self) -> List[str]:
+    def _extract_links_from_accounts_page(self) -> list[str]:
         """アカウントページからリンクを抽出。
 
         Returns:
@@ -440,6 +425,7 @@ class BrowserManager:
 
         Raises:
             ScrapingError: リンクの抽出に失敗した場合。
+
         """
         try:
             # アカウントテーブルを取得
@@ -481,14 +467,16 @@ class BrowserManager:
                         logger.info("リンクを抽出しました: %s", link)
                 except (NoSuchElementException, StaleElementReferenceException) as e:
                     logger.warning(
-                        "アカウントリンクの抽出に失敗しました: %s（現在の抽出済みリンク数: %d）",
+                        "アカウントリンクの抽出に失敗しました: %s"
+                        "（現在の抽出済みリンク数: %d）",
                         e,
                         len(links),
                     )
                     continue
 
             logger.info(
-                "アカウントページからのリンク抽出が完了しました。抽出されたリンク数: %d",
+                "アカウントページからのリンク抽出が完了しました。"
+                "抽出されたリンク数: %d",
                 len(links),
             )
             return links
@@ -499,7 +487,7 @@ class BrowserManager:
                 f"アカウントページからのリンク抽出に失敗しました: {e}"
             ) from e
 
-    def _extract_links_from_history_page(self) -> List[str]:
+    def _extract_links_from_history_page(self) -> list[str]:
         """履歴ページからリンクを抽出。
 
         Returns:
@@ -507,12 +495,13 @@ class BrowserManager:
 
         Raises:
             ScrapingError: リンクの抽出に失敗した場合。
+
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")
         return [self.driver.current_url]
 
-    def get_cookies(self) -> List[dict]:
+    def get_cookies(self) -> list[dict]:
         """現在のセッションのクッキー情報を取得。
 
         Returns:
@@ -520,6 +509,7 @@ class BrowserManager:
 
         Raises:
             ScrapingError: クッキーの取得に失敗した場合。
+
         """
         if not self.driver:
             raise ScrapingError("WebDriverが初期化されていません。")

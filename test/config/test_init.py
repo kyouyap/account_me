@@ -61,11 +61,13 @@ def test_init_with_missing_settings_file(config):
 
 def test_init_with_invalid_settings_file(config):
     """設定ファイルがディレクトリの場合のテスト。"""
-    with patch("pathlib.Path.exists", return_value=True):
-        with patch("pathlib.Path.is_file", return_value=False):
-            with pytest.raises(ConfigurationError) as exc_info:
-                config._load_settings()
-            assert "設定ファイルが正しくありません" in str(exc_info.value)
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch("pathlib.Path.is_file", return_value=False),
+        pytest.raises(ConfigurationError) as exc_info,
+    ):
+        config._load_settings()
+    assert "設定ファイルが正しくありません" in str(exc_info.value)
 
 
 def test_init_with_empty_settings_file(config):

@@ -1,3 +1,62 @@
+# [project] セクション
+# プロジェクトの基本メタ情報を定義します。
+# ・name: パッケージ名
+# ・version: バージョン番号
+# ・description: プロジェクト概要
+# ・authors: 作者情報のリスト
+# ・requires-python: 対応する Python バージョン
+# ・readme: README ファイルへのパス
+# ・dependencies: 実行時に必要な依存パッケージ一覧
+
+# [tool.ruff] セクション
+# Ruff（Python 向け静的解析ツール）の共通設定。
+# ・exclude: リント対象から除外するファイル／ディレクトリ
+# ・line-length: 1 行の最大長
+# ・indent-width: インデント幅
+
+# [tool.ruff.lint] セクション
+# Ruff の lint ルール設定。
+# ・select: 有効化するエラー／警告コード
+# ・ignore: 無視するエラー／警告コード
+# ・fixable: --fix 実行時に自動修正可能なルール
+# ・unfixable: 自動修正不可のルール
+# ・dummy-variable-rgx: 未使用変数として許容する名前の正規表現
+
+# [tool.ruff.format] セクション
+# Ruff のフォーマット (整形) 設定。
+# ・quote-style: 文字列の引用符スタイル (" または ')
+# ・indent-style: インデントに使用する文字 (space/tab)
+# ・skip-magic-trailing-comma: マジックトレーリングカンマをスキップ
+# ・line-ending: 行末文字 (LF/CRLF)
+
+# [tool.ruff.lint.per-file-ignores] セクション
+# ファイル／ディレクトリ単位で特定ルールを無視する設定。
+# 例: tests/** 配下では INP001, S101 を無視
+
+# [tool.mypy] セクション
+# mypy（静的型チェック）の基本設定。
+# ・ignore_missing_imports: 型情報がない外部モジュールを無視
+
+# [[tool.mypy.overrides]] セクション
+# モジュールごとの mypy オーバーライド設定。
+# ・module: 対象モジュール名
+# ・ignore_missing_imports: 型情報がない場合でもエラーとしない
+
+# [tool.pytest.ini_options] セクション
+# pytest の実行設定。
+# ・pythonpath: テスト実行時の PYTHONPATH
+# ・testpaths: テストディレクトリ
+# ・python_files: テストファイル名パターン
+# ・asyncio_default_fixture_loop_scope: asyncio 用イベントループのスコープ
+
+# [tool.coverage.report] セクション
+# カバレッジレポートの設定。
+# ・exclude_lines: カバレッジ対象から除外する行パターン
+# ・omit: カバレッジ集計から除外するファイル
+
+# [tool.uv] セクション
+# 開発用依存関係 (dev-dependencies)。
+# 開発／テスト実行時に必要なツールやライブラリを指定
 [project]
 name = "default"
 version = "0.1.0"
@@ -24,6 +83,93 @@ dependencies = [
     "google-auth-httplib2>=0.1.0",
     "google-cloud-secret-manager>=2.16.0",
 ]
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = [    
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+ignore = [
+    "COM812",
+    "COM819",
+    "D100",
+    "D203",
+    "D213",
+    "D300",
+    "E111",
+    "E114",
+    "E117",
+    "ISC001",
+    "ISC002",
+    "Q000",
+    "Q001",
+    "Q002",
+    "Q003",
+    "W191",
+]
+
+fixable = ["ALL"]
+unfixable = []
+
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+
+indent-style = "space"
+
+skip-magic-trailing-comma = false
+
+line-ending = "auto"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["INP001", "S101"]
 
 [tool.mypy]
 ignore_missing_imports = true

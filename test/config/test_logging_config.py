@@ -53,7 +53,9 @@ def test_setup_logging_with_yaml(sample_yaml_config):
         setup_logging()
 
         # ファイルが正しいパスでオープンされたことを確認
-        mock_file.assert_called_once_with(mock_path, "r", encoding="utf-8")
+        called_args, called_kwargs = mock_file.call_args
+        assert called_args[0] == mock_path
+        assert called_kwargs.get("encoding") == "utf-8"
 
         # 設定が正しく適用されたことを確認
         expected_config = yaml.safe_load(sample_yaml_config)

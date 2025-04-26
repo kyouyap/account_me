@@ -17,178 +17,238 @@
 無視するように言われた場合は、そのまま続行します。
 
 
-
 # コーディングプラクティス
+
+---
 
 ## 原則
 
 ### 関数型アプローチ (FP)
 - **純粋関数を優先:** 外部状態に依存しない関数を作る  
-- **不変データ構造を使用:** 変更不可なオブジェクト（例: dataclass(frozen=True)）を活用する  
-- **副作用を分離:** IO や外部通信は関数の境界に押し出す  
-- **型安全性を確保:** 型ヒントや NewType を活用する
-
-### ドメイン駆動設計 (DDD)
-- **値オブジェクトとエンティティを区別:** 不変な値オブジェクトと、ID で同一性を判断するエンティティを明確に分ける  
-- **集約で整合性を保証:** 関連する値やエンティティを集約し、一貫性を保つ  
-- **リポジトリでデータアクセスを抽象化:** データの永続化や取得はインターフェースで抽象化する  
-- **境界付けられたコンテキストを意識:** ドメインごとに独立したモジュール・パッケージ設計を行う
+- **不変データ構造を使用:** 変更不可なオブジェクト（例: `@dataclass(frozen=True)`）を活用する  
+- **副作用を分離:** I/O や外部通信は関数の境界に押し出す  
+- **型安全性を確保:** 型ヒントをフル活用し、`mypy --strict` を CI で必須にする  
 
 ### テスト駆動開発 (TDD)
-- **Red-Green-Refactor サイクル:** まず失敗するテストを書き、実装してテストを通し、リファクタリングする  
-- **テストを仕様として扱う:** テストコード自体が仕様であると捉える  
-- **小さな単位で反復:** 単体テストを重ねながら進める  
-- **継続的なリファクタリング:** 常にコードを改善する意識を持つ
+- **Red-Green-Refactor サイクル:** 失敗するテスト → 実装 → リファクタ  
+- **テスト＝仕様:** テストがシステムの期待振る舞いを語る  
+- **小さな単位で反復:** 1 つの振る舞いにつき 1 つのテスト  
+- **常にリファクタ:** 重複排除と設計改善を継続  
 
 ---
 
-## 実装パターン
+## 1. コードスタイル
 
-### 型定義
+| ツール           | 設定／運用                                            |
+|------------------|-------------------------------------------------------|
+| **black**        | 行長 88、`--target-version py313`                     |
+| **ruff**         | flake8 + isort + pep8-naming を統合。CI で必須       |
+| **pre-commit**   | `pre-commit run --all-files` を Git hook で強制       |
 
-Python では、`typing.NewType` を利用してブランデッド型を作ることで、型安全性を高められます。
-
-```python
-from typing import NewType
-
-Money = NewType("Money", float)
-Email = NewType("Email", str)
-```
-
-### 値オブジェクト
-
-値オブジェクトは不変で、値に基づく同一性を持ち、自己検証を行います。以下は、金額（Money）の作成関数の例です。
-
-```python
-from typing import Union, TypeVar, Generic
-
-T = TypeVar("T")
-E = TypeVar("E")
-
-class Result(Generic[T, E]):
-    def __init__(self, ok: bool, value: Union[T, None] = None, error: Union[E, None] = None):
-        self.ok = ok
-        self.value = value
-        self.error = error
-
-    def is_ok(self) -> bool:
-        return self.ok
-
-    def is_err(self) -> bool:
-        return not self.ok
-
-def ok(value: T) -> Result[T, E]:
-    return Result(True, value=value)
-
-def err(error: E) -> Result[T, E]:
-    return Result(False, error=error)
-
-def create_money(amount: float) -> Result[Money, Exception]:
-    if amount < 0:
-        return err(Exception("負の金額不可"))
-    return ok(Money(amount))
-```
-
-### エンティティ
-
-エンティティは ID に基づく同一性を持ち、内部状態の更新を制御します。Python では `dataclass` を利用して表現します。
-
-```python
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class UserEntity:
-    id: str
-    name: str
-```
-
-### リポジトリ
-
-リポジトリは、ドメインモデルのみを扱い、永続化の詳細を隠蔽します。テスト用のインメモリ実装も用意します。
-
-```python
-from abc import ABC, abstractmethod
-from typing import Dict
-
-class UserRepository(ABC):
-    @abstractmethod
-    def get_user(self, user_id: str) -> Result[UserEntity, Exception]:
-        pass
-
-class InMemoryUserRepository(UserRepository):
-    def __init__(self):
-        self.users: Dict[str, UserEntity] = {}
-
-    def add_user(self, user: UserEntity):
-        self.users[user.id] = user
-
-    def get_user(self, user_id: str) -> Result[UserEntity, Exception]:
-        if user_id in self.users:
-            return ok(self.users[user_id])
-        return err(Exception("User not found"))
-```
-
-### アダプターパターン
-
-外部依存（例えば、外部 API へのアクセス）を抽象化するため、アダプターパターンを利用します。
-
-```python
-from abc import ABC, abstractmethod
-import requests
-
-class APIAdapter(ABC):
-    @abstractmethod
-    def fetch_data(self, endpoint: str) -> dict:
-        pass
-
-class RealAPIAdapter(APIAdapter):
-    def fetch_data(self, endpoint: str) -> dict:
-        response = requests.get(endpoint)
-        response.raise_for_status()
-        return response.json()
-```
+> *スタイル議論はツールに委ね、コードレビューでは設計・命名の本質に集中する。*
 
 ---
 
-## 実装手順
+## 2. 型ヒント & 静的解析
 
-1. **型設計**  
-   - まず型定義（値オブジェクト、エンティティ、Result 型など）を行い、ドメインの言語を型で表現します。
-
-2. **純粋関数から実装**  
-   - 外部依存のない純粋関数を先に実装し、テストを先に書きます（TDD）。
-
-3. **副作用を分離**  
-   - IO 操作や外部通信は関数の境界に押し出し、必要ならば async/await や同期処理と分離します。
-
-4. **アダプター実装**  
-   - 外部サービスやデータベースアクセスはアダプターパターンで抽象化し、テスト用のモック実装を用意します。
-
----
-
-## プラクティス
-
-- 小さく始め、段階的に拡張する  
-- 過度な抽象化は避け、必要な箇所のみ抽象化する  
-- コードよりも型定義を重視し、ドメインのルールを型で表現する  
-- 複雑さに応じて実装アプローチを調整する
+- **PEP 695** の新ジェネリック構文（`class Box[T]: ...`）を活用  
+- ファイル先頭に必ず `from __future__ import annotations` を記述  
+- 型エイリアス例:  
+  ```python
+  type JSON = dict[str, "JSON | str | int | bool | None"]
+  ```  
+- **mypy 設定** (`pyproject.toml` 抜粋)  
+  ```ini
+  [tool.mypy]
+  python_version = "3.13"
+  strict = true
+  incremental = true
+  warn_unused_ignores = true
+  ```
 
 ---
 
-## コードスタイル
+## 3. Docstring 規約（Google Style）
 
-- **関数優先:** 必要な場合のみクラスを使用（特にエンティティやリポジトリなど）
-- **不変更新:** データは可能な限り不変（例: frozen dataclass）にする
-- **早期リターン:** 条件分岐は早期リターンでフラットに
-- **エラーとユースケースの列挙:** 可能ならエラーや状態を Enum で定義する
+```python
+def fetch_user(user_id: int) -> User:
+    """Retrieve a user record.
+
+    Args:
+        user_id: Unique identifier of the user.
+
+    Returns:
+        User: Retrieved user object.
+
+    Raises:
+        UserNotFoundError: If the user does not exist.
+
+    Examples:
+        >>> user = fetch_user(42)
+        >>> assert user.id == 42
+    """
+```
+- サマリ → 詳細 → Args → Returns → Raises → Examples の順序を厳守  
+- 1行サマリは動詞から始める  
+- Examples には `>>>` 形式で記述し、doctest 可能に
 
 ---
 
-## テスト戦略
+## 4. ディレクトリ構成（src レイアウト）
 
-- 純粋関数の単体テストを最優先  
-- インメモリ実装を用いたリポジトリのテストを実施  
-- テスト可能性を最初から設計に組み込み、アサートファーストで期待結果を記述する
+```
+project/
+├── docs/                     # ドキュメント
+├── src/
+│   └── my_package/           # アプリケーションコード
+│       ├── models/           # データ構造・スキーマ定義
+│       ├── services/         # ビジネスロジック
+│       ├── adapters/         # 外部連携（DB, API など）
+│       ├── cli/              # CLI エントリポイント
+│       ├── utils/            # 汎用ユーティリティ
+│       └── settings.py       # 設定管理（Pydantic など）
+├── tests/                    # テストコード
+├── pyproject.toml
+└── README.md
+```
+- `src/` 以下は機能ごとに明確に分割  
+- プロジェクト固有の追加構造は都度追記
+
+---
+
+## 5. 依存性の注入（DI）
+
+```python
+from typing import Protocol
+
+class UserRepo(Protocol):
+    def save(self, user: User) -> None: ...
+
+class SqlUserRepo:
+    def save(self, user: User) -> None:
+        # 実際の DB 保存処理
+        ...
+
+class UserService:
+    def __init__(self, repo: UserRepo) -> None:
+        self._repo = repo
+
+    def register(self, user: User) -> None:
+        self._repo.save(user)
+```
+- **コンストラクタインジェクション** を第一選択  
+- `dependency-injector` 等のコンテナ導入で設定と実実装を切り分け、テスト時は Stub / Mock に差し替え
+
+---
+
+## 6. エラー処理
+
+- **ビジネスエラー用** にカスタム例外を定義  
+  ```python
+  class BusinessError(Exception):
+      """ビジネス要件に起因するエラー。"""
+  ```
+- 組み込み例外をむやみに握りつぶさない  
+- `try / except / else / finally` を適切に使い分け、必要に応じてロールバック処理を組み込む  
+- 例外メッセージには検索可能なキーワードと変数値を含める
+
+---
+
+## 7. ロギング
+
+- `structlog` + 標準 `logging` で JSON フォーマット出力  
+- **ログレベル基準**  
+  - DEBUG: 詳細な変数内容やループ内部  
+  - INFO: 正常処理の通過点  
+  - WARNING: リトライ可能な軽微エラー  
+  - ERROR: 回復不能な致命エラー（アラート）  
+- ContextVar でトレース ID を伝搬し、一貫したログ追跡を実現
+
+---
+
+## 8. テスト指針
+
+| 項目               | 推奨                                      |
+|--------------------|-------------------------------------------|
+| **フレームワーク** | `pytest>=8`, `pytest-asyncio`             |
+| **パターン**       | Arrange–Act–Assert を徹底                 |
+| **カバレッジ**     | 行 95% / 分岐 90% 以上を CI で必須          |
+| **テストダブル**   | `unittest.mock`, `pytest-mock`, `factory-boy` |
+| **フィクスチャ管理**| `conftest.py` で共通設定をまとめる        |
+
+---
+
+## 9. デザインパターン実装例
+
+### Strategy
+
+```python
+from typing import Protocol
+
+class Discount(Protocol):
+    def __call__(self, price: float) -> float: ...
+
+def no_discount(p: float) -> float:
+    return p
+
+def seasonal_discount(p: float) -> float:
+    return p * 0.9
+
+class PriceCalculator:
+    def __init__(self, strategy: Discount = no_discount) -> None:
+        self._strategy = strategy
+
+    def calc(self, price: float) -> float:
+        return self._strategy(price)
+```
+
+### Adapter
+
+```python
+class PaymentSDK:
+    def send(self, payload: dict[str, str]) -> None: ...
+
+class PaymentPort(Protocol):
+    def pay(self, amount: int) -> None: ...
+
+class PaymentAdapter:
+    def __init__(self, sdk: PaymentSDK) -> None:
+        self._sdk = sdk
+
+    def pay(self, amount: int) -> None:
+        self._sdk.send({"amount": str(amount)})
+```
+
+*(Factory, Observer, Decorator などは付録に追加推奨)*
+
+---
+
+## 10. 非同期 & 並行処理
+
+| 処理           | 推奨手法                                             |
+|----------------|------------------------------------------------------|
+| I/O バウンド   | `asyncio`, `aiohttp`, `asyncpg`                     |
+| CPU バウンド   | `concurrent.futures.ProcessPoolExecutor`            |
+| キャンセル制御 | `except asyncio.CancelledError:` は握りつぶさず再送出 |
+
+---
+
+## 11. パフォーマンス最適化
+
+- `functools.cache`, `slots=True` dataclass でメモリ最適化  
+- `heapq`, `bisect` など組み込みデータ構造を活用  
+- アルゴリズムは Big-O を意識し、適切なデータ構造を選択  
+- 必要に応じて Cython や mypyc でコンパイル検討
+
+---
+
+## 12. セキュリティ
+
+1. **Secrets 管理:** `.env`, Vault, Secret Manager を利用しコードに埋め込まない  
+2. **脆弱性スキャン:** `pip-audit`, `safety` を CI に組み込む  
+3. **入力検証:** Pydantic や `validators` で堅牢に  
+4. **Web セキュリティ:** SQLi, XSS, CSRF 対策は OWASP ASVS を参照
+
 
 
 # Python のコーディングベストプラクティス
@@ -409,6 +469,35 @@ class ApiClient:
    - 単一責任の原則 (SRP) に従い、適切な粒度でモジュール化する
    - 循環参照を避け、モジュール間の依存関係を明確に管理する
 
+5. **コード整頓・可読性向上のための指針**
+   - **ガード句（Guard Clauses）を活用する**  
+     ネストを浅く保つため、条件分岐は早期returnなどでシンプルに。ただし多用しすぎは避ける。
+   - **デッドコードはこまめに削除する**  
+     不要なコードは都度消し、バージョン管理で安全性を担保する。
+   - **対称性を意識してコードを統一する**  
+     同じ振る舞いの処理は表現を揃える。
+   - **新旧インターフェースの段階的移行を意識する**  
+     大規模な一括変更を避け、まず新しいインターフェースを定義して徐々に移行する。
+   - **自然な処理順序を意識する**  
+     「入力→処理→出力」の流れで関数や処理を並べる。
+   - **凝集度を高める**  
+     関連する処理や変数は近くにまとめ、カップリングを下げる。
+   - **宣言と初期化はまとめて行う**  
+     変数宣言と初期化を同時に行い、不要なスコープを作らない。
+   - **説明的な変数・定数を使う**  
+     マジックナンバーや複雑な式は意味のある名前に置き換える。
+   - **明示的なパラメータ設計**  
+     関数には必要な要素を明示的に引数として渡す。
+   - **長い処理は適切に分割する**  
+     ステートメントをチャンク化し、可読性を上げる。
+   - **ヘルパー関数を抽出する**  
+     再利用性の高い処理は関数やメソッドに切り出す。
+   - **細分化しすぎない**  
+     クラスや関数を細切れにしすぎず、適切な粒度を保つ。
+   - **コメントは「なぜ」を中心に、冗長なものは削除する**  
+     「何をしているか」はコード、「なぜそうするか」はコメントで明確に。
+   - **ツールを活用し段階的に整頓する**  
+     IDEの自動警告や静的解析ツールを活用し、小さな改善を積み重ねる。
 
 
 以下は、上記の TDD の基本に関するルールを Python 向けに書き換えた例です。

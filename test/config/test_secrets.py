@@ -1,11 +1,13 @@
 """シークレット管理モジュールのテスト。"""
 
-import pytest
-from unittest.mock import Mock
 import os
 import subprocess
-from exceptions.custom_exceptions import ConfigurationError
+from unittest.mock import Mock
+
+import pytest
+
 from config.secrets import get_project_number, get_secrets, update_secret
+from exceptions.custom_exceptions import ConfigurationError
 
 
 @pytest.fixture(autouse=True)

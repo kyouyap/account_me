@@ -1,6 +1,6 @@
 """BrowserManagerのテスト。"""
 
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from selenium.common.exceptions import (
@@ -58,14 +58,6 @@ def mock_browser_setup(browser_manager, mock_gmail_client, mock_form_elements):
             "elements": elements,
             "mock_file": mock_file,
         }
-
-
-@pytest.fixture
-def mock_login_setup(mock_browser_setup):
-    """ログインテスト用のセットアップ。"""
-    mock_success_element = MagicMock()
-    mock_browser_setup["success_element"] = mock_success_element
-    return mock_browser_setup
 
 
 def test_init(browser_manager):
@@ -422,3 +414,209 @@ def test_get_cookies_failure(browser_manager):
         with pytest.raises(ScrapingError) as exc_info:
             browser_manager.get_cookies()
         assert "クッキーの取得に失敗しました" in str(exc_info.value)
+
+
+# --- ここからカバレッジ強化用テスト ---
+
+
+def test_setup_driver_chromedriver_not_found(browser_manager):
+    """ChromeDriverが存在しない場合のテスト。"""
+    with (
+        patch("os.path.exists", side_effect=[False]),
+        patch("logging.getLogger"),
+        pytest.raises(ScrapingError) as exc_info,
+    ):
+        browser_manager.setup_driver()
+    assert "ChromeDriverが見つかりません" in str(exc_info.value)
+
+
+def test_setup_driver_chrome_binary_not_found(browser_manager):
+    """Chromeバイナリが存在しない場合のテスト。"""
+    with (
+        patch("os.path.exists", side_effect=[True, False]),
+        patch("logging.getLogger"),
+        pytest.raises(ScrapingError) as exc_info,
+    ):
+        browser_manager.setup_driver()
+    assert "Chromeバイナリが見つかりません" in str(exc_info.value)
+
+
+def test_setup_driver_unexpected_exception(browser_manager):
+    """setup_driverで予期せぬ例外が発生した場合のテスト。"""
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("selenium.webdriver.Chrome", side_effect=TypeError("unexpected error")),
+        patch("selenium.webdriver.chrome.service.Service"),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(ScrapingError) as exc_info:
+            browser_manager.setup_driver()
+        assert "ブラウザの設定中に予期せぬエラーが発生" in str(exc_info.value)
+
+
+def test_login_scrapingerror(browser_manager, mock_browser_setup):
+    """loginでScrapingErrorが発生した場合のテスト。"""
+    mock_setup = mock_browser_setup
+    mock_setup["driver"].page_source = "mock page source"
+    with (
+        patch.object(browser_manager, "driver", mock_setup["driver"]),
+        patch.object(
+            browser_manager,
+            "wait_and_find_element",
+            side_effect=ScrapingError("要素が見つかりません"),
+        ),
+        patch("builtins.open", mock_open()),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(AuthenticationError) as exc_info:
+            browser_manager.login("test@example.com", "password123")
+        assert "ログインプロセスでエラーが発生" in str(exc_info.value)
+
+
+def test_login_unexpected_exception(browser_manager, mock_browser_setup):
+    """loginで予期せぬ例外が発生した場合のテスト。"""
+    mock_setup = mock_browser_setup
+    mock_setup["driver"].page_source = "mock page source"
+    with (
+        patch.object(browser_manager, "driver", mock_setup["driver"]),
+        patch.object(
+            browser_manager,
+            "wait_and_find_element",
+            side_effect=Exception("予期せぬエラー"),
+        ),
+        patch("builtins.open", mock_open()),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(AuthenticationError) as exc_info:
+            browser_manager.login("test@example.com", "password123")
+        assert "ログイン処理中に予期せぬエラーが発生" in str(exc_info.value)
+
+
+def test_handle_two_factor_authentication_both_not_found(browser_manager):
+    """_handle_two_factor_authenticationで両方見つからない場合のテスト。"""
+    gmail_client = MagicMock()
+    with (
+        patch.object(
+            browser_manager,
+            "wait_and_find_element",
+            side_effect=ScrapingError("not found"),
+        ),
+        patch("logging.getLogger"),
+    ):
+        # 何もraiseされずreturnすることを確認
+        assert browser_manager._handle_two_factor_authentication(gmail_client) is None
+
+
+def test_get_links_for_download_unknown_page(browser_manager):
+    """未知のページタイプでScrapingErrorとなるテスト。"""
+    mock_driver = MagicMock()
+    with (
+        patch.object(browser_manager, "driver", mock_driver),
+        patch.object(mock_driver, "get"),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(ScrapingError) as exc_info:
+            browser_manager.get_links_for_download("http://example.com/unknown")
+        assert "未知のページタイプです" in str(exc_info.value)
+
+
+def test_extract_links_from_accounts_page_no_such_element(browser_manager):
+    """accounts_table.find_elementでNoSuchElementExceptionが発生する場合のテスト。"""
+    mock_accounts_table = MagicMock()
+    mock_accounts_table.find_element.side_effect = NoSuchElementException("not found")
+    with (
+        patch.object(
+            browser_manager, "wait_and_find_element", return_value=mock_accounts_table
+        ),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(ScrapingError) as exc_info:
+            browser_manager._extract_links_from_accounts_page()
+        assert "データテーブルの取得に失敗しました" in str(exc_info.value)
+
+
+def test_extract_links_from_accounts_page_row_no_such_element(browser_manager):
+    """table.find_elementsでNoSuchElementExceptionが発生する場合のテスト。"""
+    mock_accounts_table = MagicMock()
+    mock_table = MagicMock()
+    mock_accounts_table.find_element.return_value = mock_table
+    mock_table.find_elements.side_effect = NoSuchElementException("not found")
+    with (
+        patch.object(
+            browser_manager, "wait_and_find_element", return_value=mock_accounts_table
+        ),
+        patch("logging.getLogger"),
+    ):
+        with pytest.raises(ScrapingError) as exc_info:
+            browser_manager._extract_links_from_accounts_page()
+        assert "テーブルの行データの抽出に失敗しました" in str(exc_info.value)
+
+
+def test_extract_links_from_accounts_page_row_stale_element(browser_manager):
+    """row.find_elementでStaleElementReferenceExceptionが発生する場合のテスト。"""
+    mock_accounts_table = MagicMock()
+    mock_table = MagicMock()
+    mock_row = MagicMock()
+    mock_table.find_elements.return_value = [MagicMock(), mock_row]
+    mock_accounts_table.find_element.return_value = mock_table
+    # row.find_elementでStaleElementReferenceException
+    mock_row.find_element.side_effect = StaleElementReferenceException("stale")
+    with (
+        patch.object(
+            browser_manager, "wait_and_find_element", return_value=mock_accounts_table
+        ),
+        patch("logging.getLogger"),
+    ):
+        # linksは空リストで返る
+        links = browser_manager._extract_links_from_accounts_page()
+        assert links == []
+
+
+def test_extract_links_from_history_page_without_driver(browser_manager):
+    """_extract_links_from_history_pageでdriver未初期化時のテスト。"""
+    browser_manager.driver = None
+    with pytest.raises(ScrapingError) as exc_info:
+        browser_manager._extract_links_from_history_page()
+    assert "WebDriverが初期化されていません" in str(exc_info.value)
+
+
+def test_wait_and_find_element_returns_none(browser_manager):
+    """WebDriverWait.untilがNoneを返す場合のテスト。"""
+    mock_driver = MagicMock()
+    with (
+        patch.object(browser_manager, "driver", mock_driver),
+        patch("scraper.browser.WebDriverWait") as mock_wait,
+    ):
+        mock_wait.return_value.until.return_value = None
+        with pytest.raises(ScrapingError) as exc_info:
+            browser_manager.wait_and_find_element(By.ID, "test-id")
+        assert "要素が見つかりませんでした" in str(exc_info.value)
+
+
+def test_get_links_for_download_history_page(browser_manager):
+    """履歴ページ分岐のカバレッジテスト。"""
+    mock_driver = MagicMock()
+    mock_driver.current_url = "http://example.com/bs/history"
+    with (
+        patch.object(browser_manager, "driver", mock_driver),
+        patch("scraper.browser.logger") as mock_logger,
+    ):
+        links = browser_manager.get_links_for_download("http://example.com/bs/history")
+        assert links == ["http://example.com/bs/history"]
+        mock_logger.info.assert_any_call("履歴ページ用の処理を実行します")
+
+
+def test_extract_links_from_history_page_returns_current_url(browser_manager):
+    """_extract_links_from_history_pageのreturn値テスト。"""
+    mock_driver = MagicMock()
+    mock_driver.current_url = "http://example.com/bs/history"
+    browser_manager.driver = mock_driver
+    result = browser_manager._extract_links_from_history_page()
+    assert result == ["http://example.com/bs/history"]
+
+
+def test_login_without_driver(browser_manager):
+    """WebDriver未初期化時のloginテスト。"""
+    with pytest.raises(ScrapingError) as exc_info:
+        browser_manager.login("test@example.com", "password123")
+    assert "WebDriverが初期化されていません" in str(exc_info.value)

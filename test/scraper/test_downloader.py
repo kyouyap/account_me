@@ -182,6 +182,33 @@ def test_download_file_non_200_status(downloader):
         assert "ダウンロードに失敗しました" in str(exc_info.value)
 
 
+def test_monthly_data_csv_link_not_found(downloader, mock_settings, caplog):
+    """CSVリンクが見つからない場合のテスト。"""
+    mock_driver = MagicMock()
+    mock_driver.find_element.return_value = MagicMock()
+
+    # CSVリンクを取得する箇所で None を返すようにモック
+    mock_csv_link = MagicMock()
+    mock_csv_link.get_attribute.return_value = None
+    mock_driver.find_element.side_effect = [
+        MagicMock(),  # prev_button
+        MagicMock(),  # download_button
+        mock_csv_link,  # CSVリンク
+    ]
+
+    result = downloader._download_monthly_data(mock_driver, "test", 0, 1)
+
+    assert result is None
+    assert "1月目のCSVリンクの取得に失敗しました" in caplog.text
+
+
+def test_download_from_links_empty_list(downloader):
+    """空のリンクリストが渡された場合のテスト。"""
+    mock_driver = MagicMock()
+    result = downloader.download_from_links(mock_driver, [])
+    assert result == []
+
+
 def test_download_file_os_error(downloader):
     """ファイル操作エラーのテスト。"""
     mock_response = MagicMock()
@@ -359,28 +386,29 @@ def test_account_page_partial_month_failure(downloader, mock_settings, caplog):
     mock_settings.moneyforward.endpoints.history = "/history"
     mock_settings.moneyforward.history.months_to_download = 3
 
-    with patch("scraper.downloader.settings", mock_settings):
-        with patch.object(downloader, "download_file") as mock_download:
-            # 2つ目の月のダウンロードが失敗するシナリオ
-            success_path1 = downloader.download_dir / "test_0.csv"
-            success_path2 = downloader.download_dir / "test_2.csv"
-            success_path1.touch()
-            success_path2.touch()
+    with (
+        patch("scraper.downloader.settings", mock_settings),
+        patch.object(downloader, "download_file") as mock_download,
+    ):
+        # 2つ目の月のダウンロードが失敗するシナリオ
+        success_path1 = downloader.download_dir / "test_0.csv"
+        success_path2 = downloader.download_dir / "test_2.csv"
+        success_path1.touch()
+        success_path2.touch()
 
-            mock_download.side_effect = [
-                success_path1,
-                DownloadError("2ヶ月目のダウンロード失敗"),
-                success_path2,
-            ]
+        mock_download.side_effect = [
+            success_path1,
+            DownloadError("2ヶ月目のダウンロード失敗"),
+            success_path2,
+        ]
 
-            downloaded_files = downloader.download_from_links(mock_driver, links)
+        downloaded_files = downloader.download_from_links(mock_driver, links)
 
-            assert len(downloaded_files) == 2
-            assert downloaded_files == [success_path1, success_path2]
-            assert (
-                "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗"
-                in caplog.text
-            )
+        assert len(downloaded_files) == 2
+        assert downloaded_files == [success_path1, success_path2]
+        assert (
+            "月目のダウンロードでエラーが発生: 2ヶ月目のダウンロード失敗" in caplog.text
+        )
 
 
 def test_account_page_selenium_errors(downloader, mock_settings, caplog):
@@ -424,7 +452,10 @@ def test_download_from_links_continue_on_partial_failure(
     mock_driver = MagicMock()
 
     # settings.moneyforward.base_url + endpoints.history と完全一致させる
-    history_url = f"{mock_settings.moneyforward.base_url}{mock_settings.moneyforward.endpoints.history}"
+    history_url = (
+        f"{mock_settings.moneyforward.base_url}"
+        f"{mock_settings.moneyforward.endpoints.history}"
+    )
     links = [history_url, history_url]
 
     # 1 回目の成功用パスを用意
@@ -434,14 +465,15 @@ def test_download_from_links_continue_on_partial_failure(
     )  # ファイル自体はテストで存在を確認しないが、Path として返す
 
     # download_file のモック：最初は成功パス、次は例外を投げる
-    with patch.object(
-        downloader,
-        "download_file",
-        side_effect=[success_path, DownloadError("2 件目失敗")],
+    with (
+        patch.object(
+            downloader,
+            "download_file",
+            side_effect=[success_path, DownloadError("2 件目失敗")],
+        ),
+        patch("scraper.downloader.settings", mock_settings),
     ):
-        # 設定オブジェクトもパッチ
-        with patch("scraper.downloader.settings", mock_settings):
-            result = downloader.download_from_links(mock_driver, links)
+        result = downloader.download_from_links(mock_driver, links)
 
     # 例外は投げられず、最初のパスだけが返る
     assert result == [success_path]

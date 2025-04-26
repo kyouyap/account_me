@@ -23,7 +23,8 @@
                 "donjayamanne.python-extension-pack",
                 "4ops.terraform",
                 "ms-python.mypy-type-checker",
-                "bierner.markdown-mermaid"
+                "bierner.markdown-mermaid",
+                "tamasfe.even-better-toml"
             ]
         },
         "settings": {

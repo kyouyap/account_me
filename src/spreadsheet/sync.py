@@ -5,7 +5,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import gspread
 import pandas as pd
@@ -23,7 +22,7 @@ class SpreadsheetSync:
 
     def __init__(self) -> None:
         """初期化。"""
-        self._client: Optional[gspread.Client] = None
+        self._client: gspread.Client | None = None
 
     def _get_client(self) -> gspread.Client:
         """Google Spreadsheet APIクライアントを取得。
@@ -33,6 +32,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: クライアントの初期化に失敗した場合。
+
         """
         if not self._client:
             try:
@@ -56,6 +56,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: 必要な環境変数が設定されていない場合。
+
         """
         if not os.getenv("SPREADSHEET_KEY"):
             raise SpreadsheetError("SPREADSHEET_KEYが環境変数に設定されていません。")
@@ -75,6 +76,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: データの読み込みに失敗した場合。
+
         """
         try:
             detail_path = (
@@ -98,6 +100,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: データの読み込みに失敗した場合。
+
         """
         try:
             assets_path = (
@@ -119,6 +122,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: 更新に失敗した場合。
+
         """
         try:
             # 既存データの取得
@@ -163,6 +167,7 @@ class SpreadsheetSync:
 
         Raises:
             SpreadsheetError: 更新に失敗した場合。
+
         """
         try:
             # 既存データの取得

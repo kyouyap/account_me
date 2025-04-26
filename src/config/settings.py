@@ -22,10 +22,10 @@ Pydanticを使用して型安全な設定管理を実現し、YAMLファイル�
 Note:
     設定値は config/settings.yaml から読み込まれ、アプリケーション全体で
     シングルトンインスタンスとして使用されます。
+
 """
 
 from pathlib import Path
-from typing import List
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
@@ -38,6 +38,7 @@ class SeleniumSettings(BaseModel):
         download_directory: ダウンロードファイルの保存先ディレクトリ
         timeout: 要素待機のタイムアウト時間（秒）
         retry_count: 操作失敗時のリトライ回数
+
     """
 
     download_directory: str
@@ -52,6 +53,7 @@ class Endpoints(BaseModel):
         login: ログインページのURL
         accounts: 口座一覧ページのURL
         history: 履歴データページのURL
+
     """
 
     login: str
@@ -66,6 +68,7 @@ class SpecialRule(BaseModel):
         institution: 金融機関名
         action: 適用するアクション（例: "multiply", "add"など）
         value: アクションで使用する値
+
     """
 
     institution: str
@@ -78,6 +81,7 @@ class HistorySettings(BaseModel):
 
     Attributes:
         months_to_download: ダウンロードする履歴の月数
+
     """
 
     months_to_download: int
@@ -92,12 +96,13 @@ class MoneyForwardSettings(BaseModel):
         selenium: ブラウザ自動化の設定
         special_rules: 特別なデータ処理ルールのリスト
         history: 履歴データ取得の設定
+
     """
 
     base_url: str
     endpoints: Endpoints
     selenium: SeleniumSettings
-    special_rules: List[SpecialRule]
+    special_rules: list[SpecialRule]
     history: HistorySettings
 
 
@@ -107,6 +112,7 @@ class SpreadsheetColumn(BaseModel):
     Attributes:
         name: 列の名前（例: "日付", "金額"など）
         col: 列番号（1始まり）
+
     """
 
     name: str
@@ -120,11 +126,12 @@ class WorksheetSettings(BaseModel):
         name: ワークシート名
         start_row: データ開始行（ヘッダーを除く）
         columns: 列の設定リスト
+
     """
 
     name: str
     start_row: int
-    columns: List[SpreadsheetColumn]
+    columns: list[SpreadsheetColumn]
 
 
 class WorksheetsSettings(BaseModel):
@@ -139,6 +146,7 @@ class SpreadsheetSettings(BaseModel):
 
     Attributes:
         worksheets: 家計データと資産データのワークシート設定
+
     """
 
     worksheets: WorksheetsSettings
@@ -176,6 +184,7 @@ class Settings(BaseSettings):
         moneyforward: MoneyForward関連の設定
         spreadsheet: スプレッドシート関連の設定
         paths: 各種パス設定
+
     """
 
     moneyforward: MoneyForwardSettings
@@ -191,10 +200,11 @@ class Settings(BaseSettings):
 
         Returns:
             Settings: 設定インスタンス。
+
         """
         import yaml
 
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             config_dict = yaml.safe_load(f)
         return cls(**config_dict)
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""
-プロンプトファイルとカスタムモード定義を処理するスクリプト
+"""プロンプトファイルとカスタムモード定義を処理するスクリプト
 
 このスクリプトは以下の処理を行います：
-1. rules/ ディレクトリ内の Markdown プロンプトファイルを結合して .clinerules ファイルを生成
-2. roomodes/ ディレクトリ内のカスタムモード定義（Markdown）を読み込んで .roomodes ファイルを生成
+1. rules/ ディレクトリ内の Markdown プロンプトファイルを結合して
+   .clinerules ファイルを生成
+2. roomodes/ ディレクトリ内のカスタムモード定義（Markdown）を読み込んで
+   .roomodes ファイルを生成
 3. カスタムモードの一覧を .clinerules ファイルの末尾に追加
 
 生成されるファイル:
@@ -12,11 +13,12 @@
 - .roomodes: カスタムモード設定の JSON ファイル
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
 import json
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import yaml
 
 # 現在のスクリプトのディレクトリを取得
@@ -33,11 +35,11 @@ class RooMode:
     slug: str
     name: str
     role_definition: str
-    groups: List[str]
+    groups: list[str]
     source: str
     __filename: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSONシリアライズ用のディクショナリを返す"""
         return {
             "slug": self.slug,
@@ -49,7 +51,7 @@ class RooMode:
         }
 
 
-def parse_front_matter(content: str) -> Tuple[Dict[str, Any], str]:
+def parse_front_matter(content: str) -> tuple[dict[str, Any], str]:
     """フロントマターを解析する"""
     front_matter_match = re.match(r"^---\n([\s\S]+?)\n---\n", content)
     if not front_matter_match:
@@ -62,7 +64,7 @@ def parse_front_matter(content: str) -> Tuple[Dict[str, Any], str]:
 
 def main() -> None:
     """メイン処理"""
-    roomodes = {"customModes": []}
+    roomodes: dict[str, list[dict[str, Any]]] = {"customModes": []}
 
     # roomodesの処理
     if ROO_MODES_DIR.exists():
@@ -114,7 +116,7 @@ def main() -> None:
         print(f"Generated {OUTPUT_FILE} from {len(files)} prompt files")
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         raise
 
 
