@@ -189,7 +189,7 @@ class BrowserManager:
             raise ScrapingError(f"ブラウザの設定中に予期せぬエラーが発生: {e}") from e
 
     def wait_and_find_element(
-        self, by: By | str, value: str, timeout: int | None = None
+        self, by: str, value: str, timeout: int | None = None
     ) -> WebElement:
         """要素が見つかるまで待機して取得。
 
@@ -317,53 +317,9 @@ class BrowserManager:
             logger.info("パスワードフォームを送信")
             password_input.submit()
             logger.info("パスワード送信完了")
-            # Gmail APIクライアントを初期化
             logger.info("Gmail APIクライアントを初期化")
             gmail_client = GmailClient()
-
-            # 2段階認証の確認
-            try:
-                logger.info("2段階認証フォームの有無を確認")
-                try:
-                    code_input = self.wait_and_find_element(
-                        By.NAME, "email_otp", timeout=3
-                    )  # type: ignore
-                    logger.info("2段階認証が要求されました")
-                except ScrapingError:
-                    try:
-                        # 古い形式の2段階認証フォームを試行
-                        code_input = self.wait_and_find_element(
-                            By.NAME, "mfid_user[otp_attempt]", timeout=3
-                        )  # type: ignore
-                        logger.info("古い形式の2段階認証フォームが見つかりました")
-                    except ScrapingError as e:
-                        logger.error("2段階認証フォームが見つかりません: %s", e)
-                        if self.driver:
-                            logger.debug(
-                                "現在のページソース: %s", self.driver.page_source
-                            )
-                        raise
-
-                # 有効な認証コードを取得
-                logger.info("有効な認証コードを取得")
-                try:
-                    # メール受信とAPI反映のために少し待機（5秒）
-                    logger.info("メール受信待機中...")
-                    time.sleep(5)
-                    verification_code = gmail_client.get_verification_code()
-                    logger.info("認証コードを取得しました: %s", verification_code)
-                except (VerificationCodeError, GmailApiError) as e:
-                    logger.error("認証コードの取得に失敗: %s", e)
-                    raise AuthenticationError(f"認証コードの取得に失敗: {e}") from e
-
-                # 認証コードを入力して送信
-                logger.info("認証コードを入力: %s", verification_code)
-                code_input.send_keys(verification_code)
-                logger.info("認証コードフォームを送信")
-                code_input.submit()
-                logger.info("認証コードの送信完了")
-            except TimeoutException:
-                logger.info("2段階認証は要求されませんでした")
+            self._handle_two_factor_authentication(gmail_client)
 
             # デバッグのためにpage_sourceを保存
             logger.info("現在のページソースを保存")
@@ -396,7 +352,7 @@ class BrowserManager:
             raise AuthenticationError(f"ログインプロセスでエラーが発生: {e}") from e
         except (GmailApiError, VerificationCodeError) as e:
             logger.error("2段階認証中にエラーが発生: %s", e)
-            raise AuthenticationError(f"2段階認証に失敗しました: {e}") from e
+            raise AuthenticationError(f"認証コードの取得に失敗: {e}") from e
         except Exception as e:
             logger.error("予期せぬエラーが発生: %s", e)
             # デバッグのためにエラー時のページソースも保存
@@ -407,6 +363,26 @@ class BrowserManager:
             raise AuthenticationError(
                 f"ログイン処理中に予期せぬエラーが発生: {e}"
             ) from e
+
+    def _handle_two_factor_authentication(self, gmail_client: GmailClient) -> None:
+        """二段階認証処理を行う。"""
+        try:
+            code_input = self.wait_and_find_element(By.NAME, "email_otp", timeout=3)  # type: ignore
+        except ScrapingError:
+            try:
+                code_input = self.wait_and_find_element(
+                    By.NAME, "mfid_user[otp_attempt]", timeout=3
+                )  # type: ignore
+            except ScrapingError:
+                return
+        logger.info("2段階認証が要求されました")
+        time.sleep(5)
+        verification_code = gmail_client.get_verification_code()
+        logger.info("認証コードを取得しました: %s", verification_code)
+        code_input.send_keys(verification_code)
+        logger.info("認証コードを入力")
+        code_input.submit()
+        logger.info("認証コードの送信完了")
 
     def get_links_for_download(self, page_url: str) -> list[str]:
         """指定されたページからダウンロードリンクを抽出。
