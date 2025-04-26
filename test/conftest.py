@@ -61,7 +61,9 @@ def patch_settings(test_settings):
 
     autouse=Trueを設定しているため、自動的に全テストに適用されます。
     """
-    with patch("scraper.browser.settings", test_settings), patch(
-        "scraper.downloader.settings", test_settings
-    ), patch("scraper.scraper.settings", test_settings):
+    with (
+        patch("scraper.browser.settings", test_settings),
+        patch("scraper.downloader.settings", test_settings),
+        patch("scraper.scraper.settings", test_settings),
+    ):
         yield test_settings

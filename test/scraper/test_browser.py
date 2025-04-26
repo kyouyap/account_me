@@ -309,11 +309,10 @@ def test_login_2fa_code_expired(
         "認証コードの有効期限が切れています"
     )
 
-    with patch.object(
-        browser_manager, "wait_and_find_element"
-    ) as mock_find, patch.object(
-        browser_manager, "wait_for_new_verification_email"
-    ) as mock_wait:
+    with (
+        patch.object(browser_manager, "wait_and_find_element") as mock_find,
+        patch.object(browser_manager, "wait_for_new_verification_email") as mock_wait,
+    ):
         mock_find.side_effect = [
             mock_form_elements["email"],
             mock_form_elements["password"],
