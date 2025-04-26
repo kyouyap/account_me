@@ -15,8 +15,9 @@ Note:
 
 import logging
 
+from bigquery.sync import BigQuerySync
 from config.logging_config import setup_logging
-from exceptions.custom_exceptions import MoneyForwardError
+from exceptions.custom_exceptions import BigQueryError, MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
 from spreadsheet.sync import SpreadsheetSync
 
@@ -47,13 +48,18 @@ def run_scraping() -> None:
         scraper.scrape()
         logger.info("スクレイピングが完了しました。")
 
-        # スプレッドシートの同期
+        # スプレッドシートとBigQueryの同期
         logger.info("スプレッドシートの同期を開始します。")
-        sync = SpreadsheetSync()
-        sync.sync()
+        spreadsheet_sync = SpreadsheetSync()
+        spreadsheet_sync.sync()
         logger.info("スプレッドシートの同期が完了しました。")
 
-    except MoneyForwardError as e:
+        logger.info("BigQueryの同期を開始します。")
+        bigquery_sync = BigQuerySync()
+        bigquery_sync.sync()
+        logger.info("BigQueryの同期が完了しました。")
+
+    except (MoneyForwardError, BigQueryError) as e:
         logger.error("処理中にエラーが発生しました: %s", e)
     except Exception as e:
         logger.error("予期せぬエラーが発生しました: %s", e)
