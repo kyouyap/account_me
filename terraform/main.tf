@@ -30,6 +30,7 @@ resource "google_project_iam_member" "spreadsheet_roles" {
   for_each = toset([
     "roles/storage.objectCreator",
     "roles/bigquery.dataEditor",
+    "roles/bigquery.jobUser",
     "roles/secretmanager.secretAccessor"
   ])
   project = var.project_id
@@ -92,6 +93,7 @@ resource "google_bigquery_dataset" "moneyforward" {
   dataset_id    = "moneyforward"
   friendly_name = "MoneyForward Dataset"
   location      = var.region
+  delete_contents_on_destroy = true
 }
 
 # BigQueryテーブル（家計簿データ）
@@ -103,7 +105,7 @@ resource "google_bigquery_table" "household_data" {
   
   clustering = ["date", "major_category", "sub_category"]
 
-  deletion_protection = true
+  deletion_protection = false
 }
 
 # BigQueryテーブル（資産データ）
@@ -115,7 +117,7 @@ resource "google_bigquery_table" "assets_data" {
   
   clustering = ["date"]
 
-  deletion_protection = true
+  deletion_protection = false
 }
 
 # Spreadsheet Credential Secret
