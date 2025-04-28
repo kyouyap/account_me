@@ -17,6 +17,7 @@ import logging
 
 from bigquery.sync import BigQuerySync
 from config.logging_config import setup_logging
+from config.secrets import get_secrets
 from exceptions.custom_exceptions import BigQueryError, MoneyForwardError
 from scraper.scraper import MoneyForwardScraper
 from spreadsheet.sync import SpreadsheetSync
@@ -42,12 +43,12 @@ def run_scraping() -> None:
 
     """
     try:
+        get_secrets()
         # スクレイピングの実行
         logger.info("スクレイピングを開始します。")
         scraper = MoneyForwardScraper()
         scraper.scrape()
         logger.info("スクレイピングが完了しました。")
-
         # スプレッドシートとBigQueryの同期
         logger.info("スプレッドシートの同期を開始します。")
         spreadsheet_sync = SpreadsheetSync()

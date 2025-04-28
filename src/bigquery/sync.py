@@ -9,8 +9,10 @@ from pathlib import Path
 import gspread
 import pandas as pd
 from google.cloud import bigquery
+from google.oauth2 import service_account
 from oauth2client.service_account import ServiceAccountCredentials
 
+from config.secrets import get_project_id
 from config.settings import settings
 from exceptions.custom_exceptions import BigQueryError
 
@@ -22,9 +24,14 @@ class BigQuerySync:
 
     def __init__(self) -> None:
         """初期化。"""
-        self._client = bigquery.Client()
-        self._household_table = "household_data"
-        self._assets_table = "assets_data"
+
+        info = json.loads(os.environ["SPREADSHEET_CREDENTIAL_JSON"])  # type: ignore
+        creds = service_account.Credentials.from_service_account_info(info)
+        self._client = bigquery.Client(project=get_project_id(), credentials=creds)
+        # データセットを指定してテーブルを完全修飾
+        dataset = "moneyforward"
+        self._household_table = f"{dataset}.household_data"
+        self._assets_table = f"{dataset}.assets_data"
 
     def _get_credentials(self) -> ServiceAccountCredentials:
         """Google APIクライアントの認証情報を取得。
@@ -81,9 +88,23 @@ class BigQuerySync:
                 settings.spreadsheet.worksheets.household_data.name
             )
             settings_config = settings.spreadsheet.worksheets.household_data
+            # 全データを取得（ヘッダー行含む）
+            all_values = household_worksheet.get_all_values()
+            # ヘッダー行（3行目）までスキップしてデータ行を取得
+            data_rows = all_values[3:]  # 4行目以降がデータ
+
+            # 設定で定義された列のインデックスのみを抽出
+            columns = [col.name for col in settings_config.columns]
+            # 1-basedから0-basedに変換
+            column_indices = [col.col - 1 for col in settings_config.columns]
+
+            # 必要な列のデータのみを抽出（データ行のみ）
+            filtered_data = [[row[i] for i in column_indices] for row in data_rows]
+
+            # DataFrameの作成（columnsパラメータで列名を明示的に指定）
             df_household = pd.DataFrame(
-                household_worksheet.get_all_values()[3:],  # ヘッダー行をスキップ
-                columns=[col.name for col in settings_config.columns],
+                data=filtered_data,
+                columns=columns,
             )
 
             # 資産データ取得
@@ -91,9 +112,22 @@ class BigQuerySync:
                 settings.spreadsheet.worksheets.assets_data.name
             )
             settings_config = settings.spreadsheet.worksheets.assets_data
+            # 全データを取得（ヘッダー行含む）
+            all_values = assets_worksheet.get_all_values()
+            # ヘッダー行（3行目）までスキップしてデータ行を取得
+            data_rows = all_values[3:]  # 4行目以降がデータ
+
+            # 設定で定義された列のインデックスのみを抽出
+            columns = [col.name for col in settings_config.columns]
+            column_indices = [col.col - 1 for col in settings_config.columns]
+
+            # 必要な列のデータのみを抽出（データ行のみ）
+            filtered_data = [[row[i] for i in column_indices] for row in data_rows]
+
+            # DataFrameの作成（columnsパラメータで列名を明示的に指定）
             df_assets = pd.DataFrame(
-                assets_worksheet.get_all_values()[3:],  # ヘッダー行をスキップ
-                columns=[col.name for col in settings_config.columns],
+                data=filtered_data,
+                columns=columns,
             )
 
             return df_household, df_assets
@@ -111,13 +145,16 @@ class BigQuerySync:
 
         Returns:
             pd.DataFrame: 変換後のデータフレーム
+
+        Raises:
+            ValueError: データの変換に失敗した場合
         """
         df_bq = df.copy()
 
-        # 日付フォーマットの変換
-        df_bq["date"] = pd.to_datetime(df_bq["日付"]).dt.date
+        # 「日付」という文字列を含む行を削除
+        df_bq = df_bq[df_bq["日付"] != "日付"].copy()
 
-        # カラム名の変更
+        # カラム名の変更を最初に実行
         df_bq = df_bq.rename(
             columns={
                 "計算対象": "target_flag",
@@ -132,10 +169,41 @@ class BigQuerySync:
             }
         )
 
-        # データ型の変換
-        df_bq["target_flag"] = df_bq["target_flag"].fillna(False).astype(bool)
-        df_bq["transfer_flag"] = df_bq["transfer_flag"].fillna(False).astype(bool)
-        df_bq["amount"] = df_bq["amount"].astype(int)
+        # 日付フォーマットの変換
+        try:
+            df_bq["date"] = pd.to_datetime(df_bq["日付"], format="%Y/%m/%d").dt.date
+        except ValueError as e:
+            logger.error(
+                f"日付の変換に失敗しました。データサンプル: \n{df_bq['日付'].head()}"
+            )
+            raise ValueError(f"日付の変換に失敗しました: {e}") from e
+
+        # データ型の変換（エラー処理を追加）
+        try:
+            # フラグの変換
+            # 1/0を適切にブール値に変換
+            df_bq["target_flag"] = (
+                df_bq["target_flag"]
+                .fillna("0")
+                .astype(str)
+                .map({"1": True, "0": False})
+            )
+            df_bq["transfer_flag"] = df_bq["transfer_flag"].fillna(False).astype(bool)
+
+            # 金額の変換（小数点を考慮）と丸め処理
+            df_bq["amount"] = (
+                pd.to_numeric(df_bq["amount"], errors="coerce")
+                .round()  # 明示的な丸め処理
+                .fillna(0)
+                .astype("Int64")
+            )
+        except ValueError as e:
+            logger.error(
+                f"データ型の変換に失敗しました:\n"
+                f"金額のサンプル: {df_bq['金額（円）'].head()}\n"
+                f"エラー: {e}"
+            )
+            raise ValueError(f"データ型の変換に失敗しました: {e}") from e
 
         # タイムスタンプの追加
         current_time = datetime.datetime.now(datetime.UTC)
@@ -170,10 +238,10 @@ class BigQuerySync:
         """
         df_bq = df.copy()
 
-        # 日付フォーマットの変換
-        df_bq["date"] = pd.to_datetime(df_bq["日付"]).dt.date
+        # 「日付」という文字列を含む行を削除
+        df_bq = df_bq[df_bq["日付"] != "日付"].copy()
 
-        # カラム名の変更
+        # カラム名の変更を最初に実行
         df_bq = df_bq.rename(
             columns={
                 "合計（円）": "total_amount",
@@ -182,9 +250,35 @@ class BigQuerySync:
             }
         )
 
-        # データ型の変換
-        for col in ["total_amount", "deposit_amount", "investment_amount"]:
-            df_bq[col] = df_bq[col].astype(int)
+        # 日付フォーマットの変換
+        try:
+            df_bq["date"] = pd.to_datetime(df_bq["日付"], format="%Y/%m/%d").dt.date
+        except ValueError as e:
+            logger.error(
+                f"日付の変換に失敗しました。データサンプル: \n{df_bq['日付'].head()}"
+            )
+            raise ValueError(f"日付の変換に失敗しました: {e}") from e
+
+        # データ型の変換（エラー処理を追加）
+        try:
+            # 金額の変換（小数点を考慮）と丸め処理
+            for col in ["total_amount", "deposit_amount", "investment_amount"]:
+                df_bq[col] = (
+                    pd.to_numeric(df_bq[col], errors="coerce")
+                    .round()
+                    .fillna(0)
+                    .astype("Int64")
+                )
+        except ValueError as e:
+            logger.error(
+                f"データ型の変換に失敗しました:\n"
+                f"データのサンプル:\n"
+                f"合計: {df_bq['合計（円）'].head()}\n"
+                f"預金: {df_bq['預金・現金・暗号資産（円）'].head()}\n"
+                f"投資: {df_bq['投資信託（円）'].head()}\n"
+                f"エラー: {e}"
+            )
+            raise ValueError(f"データ型の変換に失敗しました: {e}") from e
 
         # タイムスタンプの追加
         current_time = datetime.datetime.now(datetime.UTC)
@@ -287,6 +381,7 @@ class BigQuerySync:
                     bigquery.SchemaField("updated_at", "TIMESTAMP"),
                 ],
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                clustering_fields=["date", "major_category", "sub_category"],
             )
 
             self._client.load_table_from_dataframe(
@@ -360,6 +455,8 @@ class BigQuerySync:
                     bigquery.SchemaField("updated_at", "TIMESTAMP"),
                 ],
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                # クラスタリング設定を追加
+                clustering_fields=["date"],
             )
 
             self._client.load_table_from_dataframe(

@@ -28,6 +28,32 @@ logger = logging.getLogger(__name__)
 _project_number: str | None = None
 
 
+def get_project_id() -> str:
+    """GCPプロジェクトIDを取得します。
+
+    gcloudコマンドを使用してプロジェクトIDを取得します。
+
+    Returns:
+        str: GCPプロジェクトID
+
+    Raises:
+        ConfigurationError: プロジェクトIDの取得に失敗した場合
+    """
+    try:
+        id_result = subprocess.run(
+            ["gcloud", "config", "get-value", "project"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        project_id = id_result.stdout.strip()
+        if not project_id:
+            raise ConfigurationError("プロジェクトIDが設定されていません")
+        return project_id
+    except subprocess.CalledProcessError as e:
+        raise ConfigurationError(f"プロジェクトIDの取得に失敗: {e}") from e
+
+
 def get_project_number() -> str:
     """GCPプロジェクト番号を取得します。
 
