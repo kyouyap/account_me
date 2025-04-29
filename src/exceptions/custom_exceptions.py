@@ -103,3 +103,15 @@ class ConfigurationError(MoneyForwardError):
         - 設定ファイルの読み込み失敗
         - 設定値の型が不正
     """
+
+
+class BigQueryError(MoneyForwardError):
+    """BigQueryの操作中のエラーを表します。
+
+    このエラーは以下の状況で発生する可能性があります:
+        - テーブルへのアクセス権限不足
+        - テーブルが存在しない
+        - データの更新失敗
+        - クエリの実行エラー
+        - スキーマの不整合
+    """

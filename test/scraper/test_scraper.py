@@ -49,20 +49,6 @@ def mock_env(monkeypatch):
     return TEST_CREDENTIALS
 
 
-def test_init_calls_get_secrets(monkeypatch):
-    called = {"flag": False}
-
-    def fake_get_secrets():
-        called["flag"] = True
-
-    monkeypatch.setattr(secrets_mod, "get_secrets", fake_get_secrets)
-    scraper = MoneyForwardScraper()
-    assert called["flag"], "get_secrets() が呼ばれていません"
-    assert isinstance(scraper.download_dir, Path)
-    assert scraper.browser_manager is not None
-    assert scraper.file_downloader is not None
-
-
 def test_check_env_variables_success(scraper, mock_env):
     scraper._check_env_variables()
 

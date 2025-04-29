@@ -1,0 +1,32 @@
+[
+    {
+        "name": "date",
+        "type": "DATE",
+        "mode": "REQUIRED",
+        "description": "日付"
+    },
+    {
+        "name": "category",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "資産カテゴリ"
+    },
+    {
+        "name": "amount",
+        "type": "INT64",
+        "mode": "REQUIRED",
+        "description": "金額（円）"
+    },
+    {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "レコード作成日時"
+    },
+    {
+        "name": "updated_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "レコード更新日時"
+    }
+]

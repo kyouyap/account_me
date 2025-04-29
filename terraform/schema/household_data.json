@@ -1,0 +1,74 @@
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "取引ID"
+    },
+    {
+        "name": "target_flag",
+        "type": "BOOLEAN",
+        "mode": "REQUIRED",
+        "description": "計算対象フラグ"
+    },
+    {
+        "name": "date",
+        "type": "DATE",
+        "mode": "REQUIRED",
+        "description": "取引日"
+    },
+    {
+        "name": "description",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "取引内容"
+    },
+    {
+        "name": "amount",
+        "type": "INT64",
+        "mode": "REQUIRED",
+        "description": "金額（円）"
+    },
+    {
+        "name": "institution",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "金融機関"
+    },
+    {
+        "name": "major_category",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "大項目"
+    },
+    {
+        "name": "sub_category",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "中項目"
+    },
+    {
+        "name": "memo",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "メモ"
+    },
+    {
+        "name": "transfer_flag",
+        "type": "BOOLEAN",
+        "mode": "REQUIRED",
+        "description": "振替フラグ"
+    },
+    {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "レコード作成日時"
+    },
+    {
+        "name": "updated_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "レコード更新日時"
+    }
+]
