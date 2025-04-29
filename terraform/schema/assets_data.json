@@ -6,22 +6,16 @@
         "description": "日付"
     },
     {
-        "name": "total_amount",
-        "type": "INT64",
+        "name": "category",
+        "type": "STRING",
         "mode": "REQUIRED",
-        "description": "合計（円）"
+        "description": "資産カテゴリ"
     },
     {
-        "name": "deposit_amount",
+        "name": "amount",
         "type": "INT64",
         "mode": "REQUIRED",
-        "description": "預金・現金・暗号資産（円）"
-    },
-    {
-        "name": "investment_amount",
-        "type": "INT64",
-        "mode": "REQUIRED",
-        "description": "投資信託（円）"
+        "description": "金額（円）"
     },
     {
         "name": "created_at",

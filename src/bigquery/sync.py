@@ -228,7 +228,7 @@ class BigQuerySync:
         ]
 
     def _transform_assets_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """資産データをBigQuery用に変換。
+        """資産データをBigQuery用に変換（縦持ちデータに変換）。
 
         Args:
             df: 変換元のデータフレーム
@@ -241,15 +241,6 @@ class BigQuerySync:
         # 「日付」という文字列を含む行を削除
         df_bq = df_bq[df_bq["日付"] != "日付"].copy()
 
-        # カラム名の変更を最初に実行
-        df_bq = df_bq.rename(
-            columns={
-                "合計（円）": "total_amount",
-                "預金・現金・暗号資産（円）": "deposit_amount",
-                "投資信託（円）": "investment_amount",
-            }
-        )
-
         # 日付フォーマットの変換
         try:
             df_bq["date"] = pd.to_datetime(df_bq["日付"], format="%Y/%m/%d").dt.date
@@ -259,21 +250,47 @@ class BigQuerySync:
             )
             raise ValueError(f"日付の変換に失敗しました: {e}") from e
 
-        # データ型の変換（エラー処理を追加）
+        # カラム名の変更と金額の変換
         try:
-            # 金額の変換（小数点を考慮）と丸め処理
-            for col in ["total_amount", "deposit_amount", "investment_amount"]:
-                df_bq[col] = (
-                    pd.to_numeric(df_bq[col], errors="coerce")
-                    .round()
-                    .fillna(0)
-                    .astype("Int64")
+            # 預金データの処理
+            df_deposit = df_bq.copy()
+            df_deposit["category"] = "deposit"
+            df_deposit["amount"] = (
+                pd.to_numeric(
+                    df_deposit["預金・現金・暗号資産（円）"]
+                    .str.replace("¥", "")  # ¥記号を削除
+                    .str.replace(",", ""),  # カンマを削除
+                    errors="coerce",
                 )
+                .round()
+                .fillna(0)
+                .astype("Int64")
+            )
+
+            df_deposit = df_deposit[df_deposit.amount != 0]
+
+            # 投資データの処理
+            df_investment = df_bq.copy()
+            df_investment["category"] = "investment"
+            df_investment["amount"] = (
+                pd.to_numeric(
+                    df_investment["投資信託（円）"]
+                    .str.replace("¥", "")
+                    .str.replace(",", ""),
+                    errors="coerce",
+                )
+                .round()
+                .fillna(0)
+                .astype("Int64")
+            )
+            df_investment = df_investment[df_investment.amount != 0]
+            # データを縦に結合
+            df_bq = pd.concat([df_deposit, df_investment])
+
         except ValueError as e:
             logger.error(
                 f"データ型の変換に失敗しました:\n"
                 f"データのサンプル:\n"
-                f"合計: {df_bq['合計（円）'].head()}\n"
                 f"預金: {df_bq['預金・現金・暗号資産（円）'].head()}\n"
                 f"投資: {df_bq['投資信託（円）'].head()}\n"
                 f"エラー: {e}"
@@ -288,9 +305,8 @@ class BigQuerySync:
         return df_bq[
             [
                 "date",
-                "total_amount",
-                "deposit_amount",
-                "investment_amount",
+                "category",
+                "amount",
                 "created_at",
                 "updated_at",
             ]
@@ -448,15 +464,14 @@ class BigQuerySync:
                 # スキーマを明示的に指定 (変換後のカラム)
                 schema=[
                     bigquery.SchemaField("date", "DATE"),
-                    bigquery.SchemaField("total_amount", "INTEGER"),
-                    bigquery.SchemaField("deposit_amount", "INTEGER"),
-                    bigquery.SchemaField("investment_amount", "INTEGER"),
+                    bigquery.SchemaField("category", "STRING"),
+                    bigquery.SchemaField("amount", "INTEGER"),
                     bigquery.SchemaField("created_at", "TIMESTAMP"),
                     bigquery.SchemaField("updated_at", "TIMESTAMP"),
                 ],
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
                 # クラスタリング設定を追加
-                clustering_fields=["date"],
+                clustering_fields=["date", "category"],
             )
 
             self._client.load_table_from_dataframe(
@@ -471,18 +486,14 @@ class BigQuerySync:
             merge_query = f"""
             MERGE `{self._assets_table}` T
             USING `{tmp_table}` S
-            ON T.date = S.date
+            ON T.date = S.date AND T.category = S.category
             WHEN MATCHED THEN
                 UPDATE SET
-                    total_amount = S.total_amount,
-                    deposit_amount = S.deposit_amount,
-                    investment_amount = S.investment_amount,
+                    amount = S.amount,
                     updated_at = CURRENT_TIMESTAMP()
             WHEN NOT MATCHED THEN
-                INSERT (date, total_amount, deposit_amount,
-                        investment_amount, created_at, updated_at)
-                VALUES (S.date, S.total_amount, S.deposit_amount,
-                        S.investment_amount, S.created_at, S.updated_at)
+                INSERT (date, category, amount, created_at, updated_at)
+                VALUES (S.date, S.category, S.amount, S.created_at, S.updated_at)
             """
             self._client.query(merge_query).result()  # result() を待つ
             logger.info(f"資産データテーブル {self._assets_table} をMERGEしました。")
