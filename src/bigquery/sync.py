@@ -255,37 +255,47 @@ class BigQuerySync:
             # 預金データの処理
             df_deposit = df_bq.copy()
             df_deposit["category"] = "deposit"
-            df_deposit["amount"] = (
-                pd.to_numeric(
-                    df_deposit["預金・現金・暗号資産（円）"]
-                    .str.replace("¥", "")  # ¥記号を削除
-                    .str.replace(",", ""),  # カンマを削除
-                    errors="coerce",
-                )
-                .round()
-                .fillna(0)
-                .astype("Int64")
-            )
 
-            df_deposit = df_deposit[df_deposit.amount != 0]
+            def _convert_amount(series):
+                """金額列を数値型に変換する共通関数"""
+                if series.dtype == "object":
+                    # 文字列型の場合、¥記号とカンマを削除してから変換
+                    return (
+                        pd.to_numeric(
+                            series.astype(str)
+                            .str.replace("¥", "", regex=False)
+                            .str.replace(",", "", regex=False),
+                            errors="coerce",
+                        )
+                        .round()
+                        .fillna(0)
+                        .astype("Int64")
+                    )
+                else:
+                    # 既に数値型の場合は直接変換
+                    return (
+                        pd.to_numeric(series, errors="coerce")
+                        .round()
+                        .fillna(0)
+                        .astype("Int64")
+                    )
 
-            # 投資データの処理
-            df_investment = df_bq.copy()
-            df_investment["category"] = "investment"
-            df_investment["amount"] = (
-                pd.to_numeric(
-                    df_investment["投資信託（円）"]
-                    .str.replace("¥", "")
-                    .str.replace(",", ""),
-                    errors="coerce",
-                )
-                .round()
-                .fillna(0)
-                .astype("Int64")
-            )
-            df_investment = df_investment[df_investment.amount != 0]
-            # データを縦に結合
-            df_bq = pd.concat([df_deposit, df_investment])
+            # 資産カテゴリごとにデータを処理する
+            categories = [
+                {"category": "deposit", "amount_column": "預金・現金・暗号資産（円）"},
+                {"category": "investment", "amount_column": "投資信託（円）"},
+            ]
+
+            dfs = []
+            for cat in categories:
+                df_cat = df_bq.copy()
+                df_cat["category"] = cat["category"]
+                df_cat["amount"] = _convert_amount(df_cat[cat["amount_column"]])
+                df_cat = df_cat[df_cat.amount != 0]  # 金額が0のレコードを除外
+                dfs.append(df_cat)
+
+            # すべてのデータフレームを結合
+            df_bq = pd.concat(dfs)
 
         except ValueError as e:
             logger.error(
