@@ -350,7 +350,7 @@ def test_get_links_for_download_success(browser_manager):
         patch.object(browser_manager, "driver", mock_driver),
         patch.object(browser_manager, "wait_and_find_element") as mock_find,
     ):
-        mock_find.side_effect = [mock_table]
+        mock_find.side_effect = [MagicMock(), mock_table]
 
         # URLを/accountsに変更
         links = browser_manager.get_links_for_download("http://example.com/accounts")

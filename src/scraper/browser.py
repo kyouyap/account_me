@@ -406,6 +406,7 @@ class BrowserManager:
         try:
             # URLに基づいて処理を分岐
             if "/accounts" in page_url:
+                self.wait_and_find_element(By.CSS_SELECTOR, ".btn.btn-warning").click()  # type: ignore
                 logger.info("アカウントページ用の処理を実行します")
                 return self._extract_links_from_accounts_page()
             if "/bs/history" in page_url:
